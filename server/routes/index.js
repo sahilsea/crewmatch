@@ -3,12 +3,17 @@ import { protect, adminOnly, profileRequired } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import {
   registerSchema, loginSchema, profileSchema, swipeSchema, createCrewSchema, addMemberSchema,
+  eventInputSchema, checkinSchema, submitSchema, approveSchema, rejectSchema,
 } from '../utils/schemas.js';
 import { register, login, me } from '../controllers/authController.js';
 import { getOptions, updateProfile, getUser, deleteAccount } from '../controllers/userController.js';
 import { getDeck, swipe, resetPasses } from '../controllers/deckController.js';
 import { getMatches, unmatch } from '../controllers/matchController.js';
 import { createCrew, getMyCrew, addMember, renameCrew, leaveCrew } from '../controllers/crewController.js';
+import {
+  listEvents, getEvent, joinEvent, leaveEvent, checkIn, submitEntry, getLeaderboard,
+  adminListEvents, createEvent, updateEvent, deleteEvent, approveEntry, rejectEntry,
+} from '../controllers/eventController.js';
 import { getStats, listUsers } from '../controllers/adminController.js';
 
 const router = Router();
@@ -42,7 +47,22 @@ router.patch('/crews/mine', validate(createCrewSchema.pick({ name: true })), ren
 router.post('/crews/mine/members', validate(addMemberSchema), addMember);
 router.delete('/crews/mine', leaveCrew);
 
+// Hackathon hub: events, challenges and the leaderboard (docs/hackathon-api.md)
+router.get('/events', listEvents);
+router.get('/events/:id', getEvent);
+router.post('/events/:id/join', joinEvent);
+router.delete('/events/:id/join', leaveEvent);
+router.post('/events/:id/checkin', validate(checkinSchema), checkIn);
+router.post('/events/:id/submit', validate(submitSchema), submitEntry);
+router.get('/leaderboard', getLeaderboard);
+
 router.get('/admin/stats', adminOnly, getStats);
 router.get('/admin/users', adminOnly, listUsers);
+router.get('/admin/events', adminOnly, adminListEvents);
+router.post('/admin/events', adminOnly, validate(eventInputSchema), createEvent);
+router.patch('/admin/events/:id', adminOnly, validate(eventInputSchema.partial()), updateEvent);
+router.delete('/admin/events/:id', adminOnly, deleteEvent);
+router.post('/admin/events/:id/entries/:crewId/approve', adminOnly, validate(approveSchema), approveEntry);
+router.post('/admin/events/:id/entries/:crewId/reject', adminOnly, validate(rejectSchema), rejectEntry);
 
 export default router;

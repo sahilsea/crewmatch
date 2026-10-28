@@ -1,5 +1,6 @@
 import User from '../models/User.js';
 import Crew from '../models/Crew.js';
+import Event from '../models/Event.js';
 import { OPTIONS, MAX_SUPERPOWERS } from '../config/options.js';
 import { HttpError } from '../middleware/error.js';
 
@@ -46,5 +47,7 @@ export async function leaveCrewById(crewId, userId) {
   if (crew && crew.members.length <= 1) {
     await User.updateMany({ _id: { $in: crew.members } }, { crew: null });
     await crew.deleteOne();
+    // Its event and challenge entries go with it: they free a spot and leave the leaderboard.
+    await Event.updateMany({ 'entries.crew': crew._id }, { $pull: { entries: { crew: crew._id } } });
   }
 }

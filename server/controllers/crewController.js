@@ -3,11 +3,14 @@ import Crew from '../models/Crew.js';
 import { crewChecklist } from '../utils/matching.js';
 import { MAX_CREW_SIZE } from '../config/options.js';
 import { HttpError } from '../middleware/error.js';
+import { rankCrews } from '../utils/leaderboard.js';
 import { leaveCrewById } from './userController.js';
 
 async function crewResponse(crewId) {
-  const crew = await Crew.findById(crewId).populate('members');
+  const [crew, ranking] = await Promise.all([Crew.findById(crewId).populate('members'), rankCrews()]);
   if (!crew) return null;
+  // Same numbers as the leaderboard.
+  const standing = ranking.find((c) => c.id === crew.id);
   return {
     id: crew.id,
     name: crew.name,
@@ -16,6 +19,8 @@ async function crewResponse(crewId) {
     checklist: crewChecklist(crew.members),
     ideas: crew.ideas,
     spotsLeft: MAX_CREW_SIZE - crew.members.length,
+    points: standing?.points ?? 0,
+    rank: standing?.rank ?? null,
   };
 }
 

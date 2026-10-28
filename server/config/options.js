@@ -13,3 +13,14 @@ export const OPTIONS = {
 export const MAX_SUPERPOWERS = 2;
 export const MAX_CREW_SIZE = 4;
 export const MIN_DECK_SCORE = 40;
+
+// Hackathon hub: events and challenges. Kept out of OPTIONS so /api/options stays the profile chips.
+export const EVENT_KINDS = ['event', 'challenge'];
+export const EVENT_CATEGORIES = {
+  event: ['workshop', 'talk', 'social', 'expo'],
+  challenge: ['build', 'design', 'pitch', 'quiz'],
+};
+export const ENTRY_STATUSES = ['joined', 'submitted', 'completed'];
+// Generated check-in codes skip look-alikes (I/1, O/0) so they read well off a projector.
+export const CHECKIN_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+export const CHECKIN_GRACE_MINUTES = 30;

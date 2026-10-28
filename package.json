@@ -7,7 +7,9 @@
     "install:client": "npm --prefix client install",
     "web": "npm --prefix client run dev",
     "dev": "npm --prefix server run dev",
+    "dev:all": "npm run dev & npm run web",
     "server": "npm --prefix server run dev",
-    "seed": "npm --prefix server run seed"
+    "seed": "npm --prefix server run seed",
+    "mobile": "cd mobile && flutter run"
   }
 }
