@@ -4,6 +4,8 @@
   "description": "CrewMatch: Tinder for finding student teammates. MERN web + Flutter mobile on one shared API.",
   "scripts": {
     "install:server": "npm --prefix server install",
+    "install:client": "npm --prefix client install",
+    "web": "npm --prefix client run dev",
     "dev": "npm --prefix server run dev",
     "server": "npm --prefix server run dev",
     "seed": "npm --prefix server run seed"

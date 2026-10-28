@@ -73,7 +73,9 @@ function buildStudents() {
       skills: sample(SKILLS[role], 3 + Math.floor(rand() * 2)),
       profileComplete: true,
       // About half like you back, so swiping right on them makes a match.
-      autoLike: i % 2 === 0,
+      // Spread across every role (not i % 2, which lines up with the role cycle),
+      // so whoever ranks top for you, some of them match quickly.
+      autoLike: i % 4 === 0 || i % 4 === 3,
     };
   });
 }

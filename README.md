@@ -29,7 +29,7 @@ With no `MONGO_URI`, the API runs on an auto-seeded in-memory database. See [ser
 ## Status
 
 - [x] Shared Express API with auth, profiles, swipe deck, matches, crews and admin stats
-- [ ] React web app (`client/`)
+- [x] React web app (`client/`): sign-in, profile, swipe deck, matches, crews, admin dashboard
 - [ ] Flutter mobile app (`mobile/`)
 - [ ] Deploy (API on Render, web on Vercel, MongoDB on Atlas)
 - [ ] AI features (match notes, crew project ideas)
