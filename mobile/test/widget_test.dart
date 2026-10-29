@@ -1,0 +1,124 @@
+import 'package:crewmatch/app.dart';
+import 'package:crewmatch/models/hub_event.dart';
+import 'package:crewmatch/screens/events/event_card.dart';
+import 'package:crewmatch/state/session.dart';
+import 'package:crewmatch/state/token_store.dart';
+import 'package:crewmatch/ui/theme.dart';
+import 'package:crewmatch/ui/type.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
+
+import 'support/fake_api.dart';
+import 'support/fixtures.dart';
+
+/// Pumps the whole app on a phone-sized screen and lets the session restore.
+Future<void> pumpApp(WidgetTester tester, Session session) async {
+  tester.view
+    ..physicalSize = const Size(1170, 2532)
+    ..devicePixelRatio = 3;
+  addTearDown(tester.view.reset);
+  await tester.pumpWidget(CrewMatchApp(session: session));
+  await tester.pumpAndSettle();
+}
+
+Widget _card(HubEvent event) => MaterialApp(
+      theme: buildTheme(),
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: EventCard(
+            event: event,
+            hasCrew: true,
+            busy: false,
+            onJoin: () {},
+            onLeave: () {},
+            onCheckIn: () {},
+            onSubmit: () {},
+          ),
+        ),
+      ),
+    );
+
+void main() {
+  // Tests never fetch Google Fonts; text falls back to the test font.
+  setUpAll(() => AppType.fetchFonts = false);
+
+  testWidgets('signing in lands on the ranked Discover deck', (tester) async {
+    final session = Session(
+      api: fakeApi({
+        'POST /auth/login': (_) => (200, {'token': 'jwt', 'user': userJson()}),
+        'GET /deck': (_) => (200, {
+              'scoredAgainst': 'you',
+              'count': 1,
+              'deck': [cardJson('u2', 'Tara Fernandes', score: 92)],
+            }),
+      }),
+      tokens: MemoryTokenStore(),
+    );
+    await pumpApp(tester, session);
+    expect(find.text('SIGN IN'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField).at(0), 'mobile@crewmatch.dev');
+    await tester.enterText(find.byType(TextField).at(1), 'password123');
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('DISCOVER'), findsOneWidget);
+    expect(find.text('Tara Fernandes'), findsOneWidget);
+    expect(find.text('92% FIT'), findsOneWidget);
+    expect(find.text('Fills your frontend gap'), findsOneWidget);
+    expect(find.text('Like'), findsOneWidget);
+  });
+
+  testWidgets('sign-in shows the API field errors under the inputs', (tester) async {
+    final session = Session(
+      api: fakeApi({
+        'POST /auth/login': (_) => (400, {
+              'error': 'Validation failed',
+              'details': [
+                {'field': 'email', 'message': 'Invalid email address'},
+              ],
+            }),
+      }),
+      tokens: MemoryTokenStore(),
+    );
+    await pumpApp(tester, session);
+
+    await tester.enterText(find.byType(TextField).at(0), 'not-an-email');
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Invalid email address'), findsOneWidget);
+    expect(session.user, isNull);
+  });
+
+  testWidgets('a sent-back challenge shows the reviewer note and lets the crew resubmit',
+      (tester) async {
+    await tester.pumpWidget(_card(HubEvent.fromJson(eventJson(
+      kind: 'challenge',
+      myEntry: entryJson('joined', submissionUrl: 'https://x.dev/v', note: 'Video is private'),
+    ))));
+
+    expect(find.textContaining('SENT BACK', findRichText: true), findsOneWidget);
+    expect(find.textContaining('Video is private', findRichText: true), findsOneWidget);
+    expect(find.text('Submit link'), findsOneWidget);
+    expect(find.text('Leave'), findsOneWidget);
+  });
+
+  testWidgets('a checked-in event shows its points and offers nothing more', (tester) async {
+    await tester.pumpWidget(_card(HubEvent.fromJson(eventJson(
+      myEntry: entryJson('completed', pointsAwarded: 50),
+    ))));
+
+    expect(find.textContaining('CHECKED IN · +50 PTS', findRichText: true), findsOneWidget);
+    expect(find.text('Check in'), findsNothing);
+    expect(find.text('Join'), findsNothing);
+  });
+
+  testWidgets('a live event without an RSVP offers join and check-in', (tester) async {
+    await tester.pumpWidget(_card(HubEvent.fromJson(eventJson())));
+
+    expect(find.text('Join'), findsOneWidget);
+    expect(find.text('Check in'), findsOneWidget);
+    expect(find.text('5 / 12 CREWS'), findsOneWidget);
+  });
+}
