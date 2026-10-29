@@ -1,14 +1,14 @@
 import { useEffect } from 'react';
 import { animate, motion, useMotionValue, useTransform } from 'motion/react';
-import { Avatar, Meta, Score, Tag } from './ui.jsx';
-import { label } from '../labels.js';
+import { Meta, Photo, Tag } from './ui.jsx';
+import { fileName } from '../format.js';
 
 const SWIPE_DISTANCE = 120;
 
 // A draggable profile card. Drag past 120px, or set `fling`, to swipe it away.
-export default function SwipeCard({ person, onSwipe, fling, active }) {
+export default function SwipeCard({ person, onSwipe, fling, active, position, total }) {
   const x = useMotionValue(0);
-  const rotate = useTransform(x, [-250, 250], [-14, 14]);
+  const rotate = useTransform(x, [-250, 250], [-10, 10]);
   const likeOpacity = useTransform(x, [20, SWIPE_DISTANCE], [0, 1]);
   const passOpacity = useTransform(x, [-SWIPE_DISTANCE, -20], [1, 0]);
 
@@ -36,35 +36,27 @@ export default function SwipeCard({ person, onSwipe, fling, active }) {
       drag={active ? 'x' : false}
       dragMomentum={false}
       onDragEnd={onDragEnd}
-      initial={active ? false : { scale: 0.94, y: 14 }}
-      animate={active ? { scale: 1, y: 0 } : { scale: 0.94, y: 14 }}
+      initial={active ? false : { scale: 0.96, y: 8 }}
+      animate={active ? { scale: 1, y: 0 } : { scale: 0.96, y: 8 }}
       aria-hidden={!active}
     >
-      <motion.span className="stamp like" style={{ opacity: likeOpacity }}>LIKE</motion.span>
-      <motion.span className="stamp pass" style={{ opacity: passOpacity }}>PASS</motion.span>
-
-      <div className="swipe-top">
-        <Avatar src={person.avatar} name={person.name} size={112} />
-        <Score value={person.score} />
-      </div>
-      <h2>{person.name}</h2>
-      <Meta person={person} />
-      {person.bio && <p className="bio">{person.bio}</p>}
-
-      {person.tags.length > 0 && (
-        <div className="reasons">
-          {person.tags.map((t) => <Tag key={t} tone="accent">✦ {t}</Tag>)}
-        </div>
-      )}
-
-      <dl className="facts">
-        <div><dt>Skills</dt><dd>{person.skills.join(', ')}</dd></div>
-        {person.superpowers.length > 0 && (
-          <div><dt>Superpowers</dt><dd>{person.superpowers.map(label).join(', ')}</dd></div>
+      <Photo src={person.avatar} name={person.name}>
+        <motion.span className="stamp like" style={{ opacity: likeOpacity }}>Like</motion.span>
+        <motion.span className="stamp pass" style={{ opacity: passOpacity }}>Pass</motion.span>
+      </Photo>
+      <p className="file-strip">
+        <span>{fileName(person.name, 'profile')}</span>
+        <span>{person.score}% fit · {position} of {total}</span>
+      </p>
+      <div className="card-info">
+        <h2>{person.name}</h2>
+        <Meta person={person} />
+        {person.bio && <p className="bio">{person.bio}</p>}
+        {person.tags.length > 0 && (
+          <div className="reasons">{person.tags.map((t) => <Tag key={t} tone="blue">{t}</Tag>)}</div>
         )}
-        <div><dt>Into</dt><dd>{person.interests.map(label).join(', ')}</dd></div>
-        <div><dt>Style</dt><dd>{label(person.commitment)} · prefers {label(person.communication).toLowerCase()}</dd></div>
-      </dl>
+        <p className="skills-line">{person.skills.join(' · ')}</p>
+      </div>
     </motion.article>
   );
 }

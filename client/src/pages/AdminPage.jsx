@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../api.js';
+import { Window } from '../components/retro.jsx';
 import { Avatar, ErrorNote, Spinner, Tag } from '../components/ui.jsx';
 import { label } from '../labels.js';
+import { toneFor } from '../format.js';
 
 // Horizontal bar list: one series, one hue, value printed at the end of each bar.
 function BarList({ title, rows }) {
   const max = Math.max(...rows.map((r) => r.count), 1);
   return (
-    <section className="card">
-      <h2>{title}</h2>
+    <Window title={title} inset={false}>
       <ul className="bars">
         {rows.map((r) => (
           <li key={r.key} title={`${label(r.key)}: ${r.count}`}>
@@ -18,7 +20,7 @@ function BarList({ title, rows }) {
           </li>
         ))}
       </ul>
-    </section>
+    </Window>
   );
 }
 
@@ -27,18 +29,20 @@ export default function AdminPage() {
   const [users, setUsers] = useState([]);
   const [query, setQuery] = useState('');
   const [error, setError] = useState(null);
+  const [version, setVersion] = useState(0);
 
-  async function load() {
-    try {
-      const [s, u] = await Promise.all([api.get('/admin/stats'), api.get('/admin/users')]);
-      setStats(s);
-      setUsers(u.users);
-    } catch (err) {
-      setError(err);
-    }
-  }
-
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    let live = true;
+    Promise.all([api.get('/admin/stats'), api.get('/admin/users')])
+      .then(([s, u]) => {
+        if (!live) return;
+        setStats(s);
+        setUsers(u.users);
+        setError(null);
+      })
+      .catch((err) => live && setError(err));
+    return () => { live = false; };
+  }, [version]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -47,41 +51,54 @@ export default function AdminPage() {
       [u.name, u.email, u.role, ...(u.skills ?? [])].some((v) => v?.toLowerCase().includes(q)));
   }, [users, query]);
 
-  if (error) return <ErrorNote error={error} />;
-  if (!stats) return <Spinner />;
+  if (!stats) return error ? <ErrorNote error={error} /> : <Spinner />;
 
+  // [label, value, tile colour]
   const tiles = [
-    ['Students', stats.totalUsers],
-    ['Profiles complete', stats.completeProfiles],
-    ['Matches made', stats.totalMatches],
-    ['Crews formed', stats.crews],
+    ['Students', stats.totalUsers, 'pink'],
+    ['Profiles complete', stats.completeProfiles, 'desk'],
+    ['Matches made', stats.totalMatches, 'blue'],
+    ['Crews formed', stats.crews, 'strip'],
+  ];
+  const hub = [
+    ['Events', stats.events, 'blue'],
+    ['Challenges', stats.challenges, 'pink'],
+    ['Waiting for review', stats.pendingSubmissions, stats.pendingSubmissions ? 'dark' : 'strip'],
   ];
 
   return (
-    <div>
-      <div className="page-head">
-        <div>
-          <h1>Dashboard</h1>
-          <p className="muted">Live numbers from the shared database. Activity on web and mobile shows up here.</p>
+    <div className="admin-page">
+      <Window
+        title="Dashboard" titleAs="h1" inset={false}
+        action={<button type="button" className="btn mono sm" onClick={() => setVersion((v) => v + 1)}>Refresh</button>}
+        strip="Live from the shared database · web + mobile"
+      >
+        <ErrorNote error={error} />
+        <div className="stat-row">
+          {tiles.map(([k, v, tone]) => (
+            <div className={`big-stat ${tone}`} key={k}><b>{v}</b><span>{k}</span></div>
+          ))}
         </div>
-        <button className="btn ghost" onClick={load}>Refresh</button>
-      </div>
+        {stats.events !== undefined && (
+          <div className="stat-row hub">
+            {hub.map(([k, v, tone]) => (
+              <Link className={`big-stat ${tone}`} key={k} to="/admin/events"><b>{v}</b><span>{k}</span></Link>
+            ))}
+          </div>
+        )}
+      </Window>
 
-      <div className="tiles">
-        {tiles.map(([k, v]) => (
-          <div className="card tile" key={k}><b>{v}</b><span>{k}</span></div>
-        ))}
-      </div>
-
-      <div className="two-col">
+      <div className="two-up">
         <BarList title="Students by role" rows={stats.byRole.map((r) => ({ key: r.role, count: r.count }))} />
-        <BarList title="Most popular interests" rows={stats.byInterest.map((r) => ({ key: r.interest, count: r.count }))} />
+        <BarList title="Top interests" rows={stats.byInterest.map((r) => ({ key: r.interest, count: r.count }))} />
       </div>
 
-      <section className="card">
-        <div className="table-head">
-          <h2>All students <span className="count">{filtered.length}</span></h2>
-          <input type="search" placeholder="Search name, email, role, skill…" value={query} onChange={(e) => setQuery(e.target.value)} />
+      <Window title="All students" inset={false} strip={`${filtered.length} ${filtered.length === 1 ? 'item' : 'items'}`}>
+        <div className="table-tools">
+          <input
+            type="search" placeholder="Search name, email, role, skill…" aria-label="Search students"
+            value={query} onChange={(e) => setQuery(e.target.value)}
+          />
         </div>
         <div className="table-wrap">
           <table>
@@ -93,7 +110,7 @@ export default function AdminPage() {
                 <tr key={u.id}>
                   <td>
                     <div className="who">
-                      <Avatar src={u.avatar} name={u.name} size={32} />
+                      <Avatar src={u.avatar} name={u.name} size={32} tone={toneFor(u.id)} />
                       <span><b>{u.name}</b><small>{u.email}</small></span>
                     </div>
                   </td>
@@ -102,7 +119,7 @@ export default function AdminPage() {
                   <td className="num">{u.matchCount}</td>
                   <td>{u.crewId ? 'Yes' : '—'}</td>
                   <td>
-                    {u.profileComplete ? <Tag tone="ok">Active</Tag> : <Tag>Incomplete</Tag>}
+                    {u.profileComplete ? <Tag tone="blue">Active</Tag> : <Tag>Incomplete</Tag>}
                     {u.seed && <Tag>Seed</Tag>}
                   </td>
                 </tr>
@@ -110,7 +127,7 @@ export default function AdminPage() {
             </tbody>
           </table>
         </div>
-      </section>
+      </Window>
     </div>
   );
 }

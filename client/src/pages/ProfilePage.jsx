@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../auth.jsx';
-import { Avatar, ErrorNote, Spinner, useOptions } from '../components/ui.jsx';
+import { useOptions } from '../hooks.js';
+import { StatusStrip, Window } from '../components/retro.jsx';
+import { Avatar, ErrorNote, FieldError, Spinner } from '../components/ui.jsx';
 import { FIELD_LABELS, label } from '../labels.js';
 
 const SINGLE = ['role', 'experienceLevel', 'schedule', 'commitment', 'communication'];
@@ -46,17 +48,19 @@ function SkillsInput({ skills, onChange }) {
   }
   return (
     <fieldset className="chip-group">
-      <legend>Skills <span className="muted">(type and press Enter)</span></legend>
-      <div className="chips">
-        {skills.map((s) => (
-          <span className="chip on removable" key={s}>
-            {s}
-            <button type="button" aria-label={`Remove ${s}`} onClick={() => onChange(skills.filter((x) => x !== s))}>×</button>
-          </span>
-        ))}
-      </div>
+      <legend>Skills <span className="muted">(type, then Enter)</span></legend>
+      {skills.length > 0 && (
+        <div className="chips">
+          {skills.map((s) => (
+            <span className="chip on removable" key={s}>
+              {s}
+              <button type="button" aria-label={`Remove ${s}`} onClick={() => onChange(skills.filter((x) => x !== s))}>×</button>
+            </span>
+          ))}
+        </div>
+      )}
       <input
-        value={text} placeholder="React, Figma, Python…" maxLength={60}
+        value={text} placeholder="React, Figma, Python…" maxLength={60} aria-label="Add a skill"
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add(); } }}
         onBlur={add}
@@ -84,6 +88,7 @@ export default function ProfilePage() {
   if (!options) return <Spinner />;
 
   const set = (k) => (v) => { setForm((f) => ({ ...f, [k]: v })); setSaved(false); };
+  const fieldErrors = error?.fieldErrors ?? {};
   const missing = [
     ...SINGLE.filter((f) => !form[f]).map((f) => FIELD_LABELS[f].toLowerCase()),
     ...(form.interests.length ? [] : ['an interest']),
@@ -110,70 +115,94 @@ export default function ProfilePage() {
 
   async function deleteAccount() {
     if (!confirm('Delete your account? Your matches and crew membership will be removed. This cannot be undone.')) return;
-    await api.del('/users/me');
-    logout();
-    navigate('/login');
+    try {
+      await api.del('/users/me');
+      logout();
+      navigate('/login');
+    } catch (err) {
+      setError(err);
+    }
   }
 
   return (
-    <form className="profile" onSubmit={save}>
-      <div className="page-head">
-        <div>
-          <h1>{firstTime ? 'Build your profile' : 'Your profile'}</h1>
-          <p className="muted">
-            {firstTime
-              ? 'Tap the options that fit. This is what your matches are scored on.'
-              : 'Changes apply to your deck straight away, on web and mobile.'}
-          </p>
-        </div>
-        <Avatar src={user.avatar} name={user.name} size={64} />
-      </div>
+    <div className="workspace profile-desk">
+      <div className="desk-main">
+        <Window title={firstTime ? 'Build your profile' : 'Your profile'} titleAs="h1" inset={false} collapsible={false}>
+          <form onSubmit={save}>
+            <div className="profile-head halftone blue">
+              <Avatar src={user.avatar} name={user.name} size={84} tone="desk" />
+              <div>
+                <p className="serif-title">{form.name || user.name}</p>
+                <p className="label ink">
+                  {firstTime ? 'Tap the options that fit. Your matches are scored on them.' : 'Changes reach your deck on web and mobile'}
+                </p>
+              </div>
+            </div>
 
-      <div className="card form-card">
-        <div className="two-col">
-          <label className="field">
-            <span>Name</span>
-            <input value={form.name} onChange={(e) => set('name')(e.target.value)} required minLength={2} />
-          </label>
-          <label className="field">
-            <span>Email</span>
-            <input value={user.email} disabled />
-          </label>
-        </div>
-        <label className="field">
-          <span>Bio <span className="muted">({280 - form.bio.length} left)</span></span>
-          <textarea rows={2} maxLength={280} value={form.bio} placeholder="One line about what you bring to a team."
-            onChange={(e) => set('bio')(e.target.value)} />
-        </label>
+            <div className="form-body">
+              <div className="two-col">
+                <label className="field">
+                  <span>Name</span>
+                  <input value={form.name} onChange={(e) => set('name')(e.target.value)} required minLength={2} />
+                  <FieldError>{fieldErrors.name}</FieldError>
+                </label>
+                <label className="field">
+                  <span>Email</span>
+                  <input value={user.email} disabled />
+                </label>
+              </div>
+              <label className="field">
+                <span>Bio ({280 - form.bio.length} left)</span>
+                <textarea
+                  rows={2} maxLength={280} value={form.bio} placeholder="One line about what you bring to a team."
+                  onChange={(e) => set('bio')(e.target.value)}
+                />
+                <FieldError>{fieldErrors.bio}</FieldError>
+              </label>
 
-        {SINGLE.map((f) => (
-          <ChipGroup key={f} name={f} values={options[f]} selected={form[f]} onChange={set(f)} />
-        ))}
-        <ChipGroup name="interests" values={options.interests} selected={form.interests} multi onChange={set('interests')} />
-        <ChipGroup name="superpowers" values={options.superpowers} selected={form.superpowers} multi
-          max={options.maxSuperpowers} onChange={set('superpowers')} />
-        <SkillsInput skills={form.skills} onChange={set('skills')} />
+              <ChipGroup name="role" values={options.role} selected={form.role} onChange={set('role')} />
+              <div className="chip-pair">
+                {SINGLE.slice(1).map((f) => (
+                  <ChipGroup key={f} name={f} values={options[f]} selected={form[f]} onChange={set(f)} />
+                ))}
+              </div>
+              <ChipGroup name="interests" values={options.interests} selected={form.interests} multi onChange={set('interests')} />
+              <ChipGroup
+                name="superpowers" values={options.superpowers} selected={form.superpowers} multi
+                max={options.maxSuperpowers} onChange={set('superpowers')}
+              />
+              <SkillsInput skills={form.skills} onChange={set('skills')} />
+              <ErrorNote error={error} />
+            </div>
 
-        <ErrorNote error={error} />
-        <div className="form-foot">
-          <span className="muted">
-            {missing.length ? `Still needed: ${missing.join(', ')}` : saved ? 'Saved ✓' : 'Looks good!'}
-          </span>
-          <button className="btn primary" disabled={busy || missing.length > 0}>
-            {busy ? 'Saving…' : firstTime ? 'Save and start swiping' : 'Save changes'}
-          </button>
-        </div>
+            <div className="form-foot">
+              <span className="label">
+                {missing.length ? `Still needed: ${missing.join(', ')}` : saved ? 'Saved ✓' : 'Looks good!'}
+              </span>
+              <button className="btn primary" disabled={busy || missing.length > 0}>
+                {busy ? 'Saving…' : firstTime ? 'Save and start swiping' : 'Save changes'}
+              </button>
+            </div>
+          </form>
+        </Window>
       </div>
 
       {!firstTime && (
-        <div className="card danger-zone">
-          <div>
-            <h3>Delete account</h3>
-            <p className="muted">Removes your profile, matches and crew membership everywhere.</p>
-          </div>
-          <button type="button" className="btn danger" onClick={deleteAccount}>Delete account</button>
+        <div className="desk-side">
+          <Window title="Account" inset={false}>
+            <div className="side-body">
+              <p>Signed in as <b>{user.email}</b>.</p>
+              <button type="button" className="btn" onClick={() => { logout(); navigate('/login'); }}>Log out</button>
+            </div>
+            <div className="side-body danger">
+              <p className="report-headline">Delete account</p>
+              <p className="muted">Removes your profile, matches and crew membership everywhere.</p>
+              <button type="button" className="btn dark" onClick={deleteAccount}>Delete account</button>
+            </div>
+            <StatusStrip>{user.matchCount} matches · {user.crewId ? 'in a crew' : 'no crew yet'}</StatusStrip>
+          </Window>
         </div>
       )}
-    </form>
+    </div>
   );
 }

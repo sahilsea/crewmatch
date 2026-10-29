@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../auth.jsx';
-import { Avatar, Empty, ErrorNote, Meta, Spinner, Tag } from '../components/ui.jsx';
-import { CHECKLIST_LABELS } from '../labels.js';
+import { Window } from '../components/retro.jsx';
+import { Avatar, Empty, ErrorNote, Meta, Scoreboard, Spinner, Tag } from '../components/ui.jsx';
+import { CheckIcon, CloseIcon } from '../components/icons.jsx';
+import { CHECKLIST_LABELS, label } from '../labels.js';
+import { toneFor } from '../format.js';
 
 const MAX_CREW = 4;
 
@@ -33,36 +36,43 @@ function CreateCrew({ matches, onCreated }) {
 
   if (matches.length === 0) {
     return (
-      <Empty title="Match with people first">
-        <p className="muted">A crew is built from your matches. Swipe right on a few people to get started.</p>
-        <Link className="btn primary" to="/">Start swiping</Link>
-      </Empty>
+      <Window title="Crew" titleAs="h1">
+        <Empty title="Match with people first">
+          <p>A crew is built from your matches. Swipe right on a few people to get started.</p>
+          <Link className="btn primary" to="/">Start swiping</Link>
+        </Empty>
+      </Window>
     );
   }
 
   return (
-    <form className="card form-card" onSubmit={submit}>
-      <h2>Start a crew</h2>
-      <p className="muted">Pick up to {MAX_CREW - 1} of your matches. Once you have a crew, your deck looks for whoever fills its gaps.</p>
-      <label className="field">
-        <span>Crew name</span>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Night Owls" required minLength={2} maxLength={50} />
-      </label>
-      <fieldset className="pick-list">
-        <legend>Members <span className="muted">({picked.length}/{MAX_CREW - 1})</span></legend>
-        {free.length === 0 && <p className="muted">All your matches are already in crews. You can start one on your own.</p>}
-        {free.map((m) => (
-          <label key={m.id} className={`pick ${picked.includes(m.id) ? 'on' : ''}`}>
-            <input type="checkbox" checked={picked.includes(m.id)} onChange={() => toggle(m.id)}
-              disabled={!picked.includes(m.id) && picked.length >= MAX_CREW - 1} />
-            <Avatar src={m.avatar} name={m.name} size={36} />
-            <span><b>{m.name}</b><Meta person={m} /></span>
-          </label>
-        ))}
-      </fieldset>
-      <ErrorNote error={error} />
-      <button className="btn primary" disabled={busy || name.trim().length < 2}>{busy ? 'Creating…' : 'Create crew'}</button>
-    </form>
+    <Window title="Start a crew" titleAs="h1" inset={false} strip={`${picked.length} of ${MAX_CREW - 1} picked`}>
+      <form className="form-body" onSubmit={submit}>
+        <p>Pick up to {MAX_CREW - 1} of your matches. Once you have a crew, your deck looks for whoever fills its gaps, and you can take it to events and challenges.</p>
+        <label className="field">
+          <span>Crew name</span>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Night Owls" required minLength={2} maxLength={50} />
+        </label>
+        <fieldset className="chip-group pick-list">
+          <legend>Members</legend>
+          {free.length === 0 && <p className="muted">All your matches are already in crews. You can start one on your own.</p>}
+          {free.map((m) => (
+            <label key={m.id} className={`pick ${picked.includes(m.id) ? 'on' : ''}`}>
+              <input
+                type="checkbox" checked={picked.includes(m.id)} onChange={() => toggle(m.id)}
+                disabled={!picked.includes(m.id) && picked.length >= MAX_CREW - 1}
+              />
+              <Avatar src={m.avatar} name={m.name} size={36} tone={toneFor(m.id)} />
+              <span className="pick-text"><b>{m.name}</b><Meta person={m} /></span>
+            </label>
+          ))}
+        </fieldset>
+        <ErrorNote error={error} />
+        <div className="row">
+          <button className="btn primary" disabled={busy || name.trim().length < 2}>{busy ? 'Creating…' : 'Create crew'}</button>
+        </div>
+      </form>
+    </Window>
   );
 }
 
@@ -72,19 +82,25 @@ export default function CrewPage() {
   const [matches, setMatches] = useState([]);
   const [error, setError] = useState(null);
   const [rename, setRename] = useState(null);
+  const [version, setVersion] = useState(0);
 
-  const load = useCallback(async () => {
-    try {
-      const [c, m] = await Promise.all([api.get('/crews/mine'), api.get('/matches')]);
-      setCrew(c.crew);
-      setMatches(m.matches);
-    } catch (err) {
-      setError(err);
-      setCrew(null);
-    }
-  }, []);
+  useEffect(() => {
+    let live = true;
+    Promise.all([api.get('/crews/mine'), api.get('/matches')])
+      .then(([c, m]) => {
+        if (!live) return;
+        setCrew(c.crew);
+        setMatches(m.matches);
+      })
+      .catch((err) => {
+        if (!live) return;
+        setError(err);
+        setCrew(null);
+      });
+    return () => { live = false; };
+  }, [version]);
 
-  useEffect(() => { load(); }, [load]);
+  const reload = () => setVersion((v) => v + 1);
 
   async function act(fn) {
     setError(null);
@@ -93,7 +109,7 @@ export default function CrewPage() {
 
   const addMember = (id) => act(async () => {
     const { crew: c } = await api.post('/crews/mine/members', { userId: id });
-    setCrew(c);
+    setCrew((old) => ({ ...old, ...c }));
     setMatches((list) => list.map((m) => (m.id === id ? { ...m, inCrew: true } : m)));
   });
 
@@ -101,7 +117,7 @@ export default function CrewPage() {
     e.preventDefault();
     act(async () => {
       const { crew: c } = await api.patch('/crews/mine', { name: rename });
-      setCrew(c);
+      setCrew((old) => ({ ...old, ...c }));
       setRename(null);
     });
   };
@@ -110,17 +126,18 @@ export default function CrewPage() {
     if (!confirm(`Leave ${crew.name}?${crew.members.length === 2 ? ' The crew will be dissolved.' : ''}`)) return;
     await api.del('/crews/mine');
     await refresh();
-    load();
+    reload();
   });
 
   if (crew === undefined) return <Spinner />;
 
   if (!crew) {
     return (
-      <div>
-        <div className="page-head"><div><h1>Crew</h1></div></div>
-        <ErrorNote error={error} />
-        <CreateCrew matches={matches} onCreated={(c) => { setCrew(c); refresh(); load(); }} />
+      <div className="workspace single">
+        <div className="desk-main">
+          <ErrorNote error={error} />
+          <CreateCrew matches={matches} onCreated={(c) => { setCrew(c); refresh(); reload(); }} />
+        </div>
       </div>
     );
   }
@@ -129,75 +146,87 @@ export default function CrewPage() {
   const missing = Object.entries(crew.checklist).filter(([, ok]) => !ok).map(([k]) => CHECKLIST_LABELS[k]);
 
   return (
-    <div>
-      <div className="page-head">
-        <div>
-          {rename === null ? (
-            <h1>{crew.name} <button className="link" onClick={() => setRename(crew.name)}>Rename</button></h1>
-          ) : (
-            <form className="rename" onSubmit={saveName}>
-              <input value={rename} onChange={(e) => setRename(e.target.value)} autoFocus minLength={2} maxLength={50} />
-              <button className="btn sm primary">Save</button>
-              <button type="button" className="btn sm ghost" onClick={() => setRename(null)}>Cancel</button>
-            </form>
+    <div className="workspace crew-desk">
+      <div className="desk-main">
+        <Window title="Crew" titleAs="h1" inset={false} strip={`${crew.members.length} members · ${crew.spotsLeft} ${crew.spotsLeft === 1 ? 'spot' : 'spots'} left`}>
+          <div className="crew-head halftone blue">
+            <div className="crew-title">
+              {rename === null ? (
+                <h2 className="crew-name">{crew.name}</h2>
+              ) : (
+                <form className="rename" onSubmit={saveName}>
+                  <label className="sr-only" htmlFor="crew-name">Crew name</label>
+                  <input id="crew-name" value={rename} onChange={(e) => setRename(e.target.value)} autoFocus minLength={2} maxLength={50} />
+                  <button className="btn sm primary">Save</button>
+                  <button type="button" className="btn sm" onClick={() => setRename(null)}>Cancel</button>
+                </form>
+              )}
+              <p className="label ink">
+                {crew.members.length} of {MAX_CREW} members · {crew.spotsLeft} {crew.spotsLeft === 1 ? 'spot' : 'spots'} left
+              </p>
+            </div>
+            <div className="row">
+              {rename === null && <button type="button" className="btn sm" onClick={() => setRename(crew.name)}>Rename</button>}
+              <button type="button" className="btn sm" onClick={leave}>Leave crew</button>
+            </div>
+          </div>
+
+          {crew.points !== undefined && <Scoreboard crew={crew} />}
+
+          <ErrorNote error={error} />
+          <ul className="member-list">
+            {crew.members.map((m) => (
+              <li className="member" key={m.id}>
+                <Avatar src={m.avatar} name={m.name} size={44} tone={toneFor(m.id)} />
+                <div className="member-text">
+                  <p className="member-name">{m.name} {m.id === user.id && <Tag tone="ink">You</Tag>}</p>
+                  <p className="label small">{[m.role && label(m.role), ...m.skills].filter(Boolean).join(' · ')}</p>
+                </div>
+                {m.id !== user.id && <a className="label ink" href={`mailto:${m.email}`}>Email</a>}
+              </li>
+            ))}
+          </ul>
+        </Window>
+      </div>
+
+      <div className="desk-side">
+        <Window title="Coverage" inset={false}>
+          <ul className="checklist">
+            {Object.entries(crew.checklist).map(([k, ok]) => (
+              <li key={k} className={ok ? 'ok' : 'miss'}>
+                <span className="check-box" aria-hidden="true">{ok ? <CheckIcon /> : <CloseIcon />}</span>
+                {CHECKLIST_LABELS[k]}
+                <span className="label small">{ok ? 'covered' : 'missing'}</span>
+              </li>
+            ))}
+          </ul>
+          {missing.length > 0 && crew.spotsLeft > 0 && (
+            <p className="side-note">Still missing {missing.join(' and ')}. <Link to="/">Your deck</Link> now ranks people who fill that gap first.</p>
           )}
-          <p className="muted">{crew.members.length} of {MAX_CREW} members · {crew.spotsLeft} spot{crew.spotsLeft === 1 ? '' : 's'} left</p>
-        </div>
-        <button className="btn ghost" onClick={leave}>Leave crew</button>
-      </div>
+        </Window>
 
-      <ErrorNote error={error} />
-
-      <section className="card checklist">
-        <h2>What your crew covers</h2>
-        <ul>
-          {Object.entries(crew.checklist).map(([k, ok]) => (
-            <li key={k} className={ok ? 'ok' : 'miss'}>
-              <span aria-hidden>{ok ? '✓' : '✗'}</span> {CHECKLIST_LABELS[k]}
-              <span className="sr-only">{ok ? 'covered' : 'missing'}</span>
-            </li>
-          ))}
-        </ul>
-        {missing.length > 0 && crew.spotsLeft > 0 && (
-          <p className="muted">Still missing {missing.join(' and ')}. <Link to="/">Your deck</Link> now ranks people who fill that gap first.</p>
+        {crew.spotsLeft > 0 && addable.length > 0 && (
+          <Window title="Add members" inset={false}>
+            <ul className="add-list">
+              {addable.map((m) => (
+                <li key={m.id}>
+                  <Avatar src={m.avatar} name={m.name} size={34} tone={toneFor(m.id)} />
+                  <span className="add-name">{m.name}<span className="label small">{label(m.role)}</span></span>
+                  <button type="button" className="btn sm primary" onClick={() => addMember(m.id)}>Add<span className="sr-only"> {m.name}</span></button>
+                </li>
+              ))}
+            </ul>
+          </Window>
         )}
-      </section>
 
-      <div className="grid">
-        {crew.members.map((m) => (
-          <article className="card person" key={m.id}>
-            <div className="person-head">
-              <Avatar src={m.avatar} name={m.name} size={56} />
-              <div>
-                <h3>{m.name} {m.id === user.id && <Tag>You</Tag>}</h3>
-                <Meta person={m} />
-              </div>
-            </div>
-            <div className="tags">{m.skills.map((s) => <Tag key={s}>{s}</Tag>)}</div>
-            {m.id !== user.id && <a className="email" href={`mailto:${m.email}`}>✉ {m.email}</a>}
-          </article>
-        ))}
+        <Window title="Ideas.txt">
+          <div className="ideas">
+            {crew.ideas.length
+              ? crew.ideas.map((i) => <div key={i.title}><p className="report-headline">{i.title}</p><p>{i.pitch}</p></div>)
+              : <p className="muted">AI-suggested projects for your crew are coming soon.</p>}
+          </div>
+        </Window>
       </div>
-
-      {crew.spotsLeft > 0 && addable.length > 0 && (
-        <section className="card add-members">
-          <h2>Add from your matches</h2>
-          {addable.map((m) => (
-            <div className="pick" key={m.id}>
-              <Avatar src={m.avatar} name={m.name} size={36} />
-              <span><b>{m.name}</b><Meta person={m} /></span>
-              <button className="btn sm" onClick={() => addMember(m.id)}>Add</button>
-            </div>
-          ))}
-        </section>
-      )}
-
-      <section className="card ideas">
-        <h2>Project ideas</h2>
-        {crew.ideas.length
-          ? crew.ideas.map((i) => <div key={i.title}><h3>{i.title}</h3><p>{i.pitch}</p></div>)
-          : <p className="muted">AI-suggested projects for your crew are coming soon.</p>}
-      </section>
     </div>
   );
 }

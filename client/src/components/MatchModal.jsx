@@ -1,44 +1,34 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import confetti from 'canvas-confetti';
-import { motion } from 'motion/react';
+import { Dialog } from './retro.jsx';
 import { Avatar } from './ui.jsx';
+import { HeartIcon } from './icons.jsx';
+import { celebrate } from '../confetti.js';
 
 export default function MatchModal({ me, them, onClose }) {
-  // Confetti once per match, not on every re-render.
-  useEffect(() => {
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    confetti({ particleCount: 140, spread: 80, origin: { y: 0.55 }, colors: ['#f0525c', '#ffb347', '#6c63ff', '#2ec4b6'] });
-  }, []);
+  const canvas = useRef(null);
 
-  useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  // Confetti once per match, not on every re-render. It draws on a canvas inside
+  // the dialog, because a modal dialog sits above everything else on the page.
+  useEffect(() => celebrate(canvas.current), []);
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <motion.div
-        className="modal match-modal" role="dialog" aria-modal="true" aria-labelledby="match-title"
-        initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="pair">
-          <Avatar src={me.avatar} name={me.name} size={88} />
-          <span className="heart">♥</span>
-          <Avatar src={them.avatar} name={them.name} size={88} />
+    <Dialog title="It's a match" onClose={onClose} className="match-window">
+      <canvas ref={canvas} className="confetti" aria-hidden="true" />
+      <div className="match-art halftone pink">
+        <Avatar src={me.avatar} name={me.name} size={96} tone="blue" />
+        <span className="match-heart"><HeartIcon size={28} /></span>
+        <Avatar src={them.avatar} name={them.name} size={96} tone="desk" />
+      </div>
+      <div className="dialog-body center">
+        <p className="serif-title">You and {them.name}</p>
+        <p>You both swiped right.</p>
+        {them.email && <p className="muted">Say hi: <a href={`mailto:${them.email}`}>{them.email}</a></p>}
+        <div className="row">
+          <button type="button" className="btn primary" onClick={onClose} data-autofocus>Keep swiping</button>
+          <Link className="btn" to="/matches">See matches</Link>
         </div>
-        <h2 id="match-title">It's a match!</h2>
-        <p>You and <b>{them.name}</b> both swiped right.</p>
-        {them.email && (
-          <p className="muted">Say hi: <a href={`mailto:${them.email}`}>{them.email}</a></p>
-        )}
-        <div className="modal-actions">
-          <button className="btn primary" onClick={onClose} autoFocus>Keep swiping</button>
-          <Link className="btn ghost" to="/matches">See matches</Link>
-        </div>
-      </motion.div>
-    </div>
+      </div>
+    </Dialog>
   );
 }
