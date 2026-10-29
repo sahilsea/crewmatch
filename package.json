@@ -10,6 +10,7 @@
     "dev:all": "npm run dev & npm run web",
     "server": "npm --prefix server run dev",
     "seed": "npm --prefix server run seed",
-    "mobile": "cd mobile && flutter run"
+    "mobile": "cd mobile && flutter run",
+    "test": "npm --prefix server test"
   }
 }
