@@ -3,6 +3,7 @@ import Event from '../models/Event.js';
 import { EVENT_KINDS, CHECKIN_GRACE_MINUTES } from '../config/options.js';
 import { HttpError } from '../middleware/error.js';
 import { rankCrews } from '../utils/leaderboard.js';
+import { postSystemMessage } from './chatController.js';
 
 // Crew names and sizes for every entry. A crew that has since dissolved populates to null.
 const withCrews = { path: 'entries.crew', select: 'name members' };
@@ -114,6 +115,7 @@ export async function checkIn(req, res) {
     event._id, crewId, { status: 'completed', pointsAwarded: event.points, completedAt: new Date() }, { open: true }
   );
   if (!checkedIn) throw new HttpError(409, 'Your crew already checked in');
+  await postSystemMessage(crewId, `${req.user.name} checked the crew in at ${event.title} · +${event.points}`);
   res.json({ event: await memberView(event._id, req.user), pointsAwarded: event.points });
 }
 

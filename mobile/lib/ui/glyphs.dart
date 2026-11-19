@@ -5,7 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'palette.dart';
 
 /// The app's little line drawings, ported from the mockups' inline SVGs.
-enum Glyph { discover, matches, crew, events, ranks, logo, close, cross, check, heart }
+enum Glyph { discover, matches, crew, events, posts, ranks, logo, close, cross, check, heart }
 
 /// Draws a [Glyph] in a square of [size].
 ///
@@ -110,6 +110,13 @@ class _GlyphPainter extends CustomPainter {
         canvas
           ..drawLine(const Offset(21, 21), const Offset(27, 21), stroke)
           ..drawLine(const Offset(21, 26), const Offset(25, 26), stroke);
+      case Glyph.posts:
+        // A feed card: photo on top, two lines of text under it.
+        shape(_rect(4, 5, 28, 26), Palette.window);
+        shape(Path()..addRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(8, 9, 20, 9), const Radius.circular(2))), Palette.pink);
+        canvas
+          ..drawLine(const Offset(9, 23), const Offset(27, 23), stroke)
+          ..drawLine(const Offset(9, 27.5), const Offset(20, 27.5), stroke);
       case Glyph.ranks:
         shape(Path()..addRect(const Rect.fromLTRB(13, 13, 23, 32)), Palette.pink);
         shape(Path()..addRect(const Rect.fromLTRB(3, 20, 13, 32)), Palette.blue);

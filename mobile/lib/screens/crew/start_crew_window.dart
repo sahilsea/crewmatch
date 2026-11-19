@@ -64,8 +64,7 @@ class _StartCrewWindowState extends State<StartCrewWindow> {
         title: 'Start a crew',
         child: EmptyState(
           title: 'Match with people first',
-          message: 'A crew is built from your matches. '
-              'Swipe right on a few people to get started.',
+          message: 'Crews are built from matches.',
           actions: [
             FilledButton(onPressed: widget.onFindPeople, child: const Text('Start swiping')),
           ],
@@ -87,11 +86,6 @@ class _StartCrewWindowState extends State<StartCrewWindow> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           spacing: 14,
           children: [
-            Text(
-              'Pick up to $_maxPicks of your matches. Once you have a crew, '
-              'your deck looks for whoever fills its gaps.',
-              style: AppType.body(),
-            ),
             LabeledField(
               label: 'Crew name',
               controller: _name,

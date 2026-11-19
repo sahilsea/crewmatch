@@ -94,7 +94,7 @@ class SwipeStackState extends State<SwipeStack> with SingleTickerProviderStateMi
     _flying = true;
     final width = context.size?.width ?? 400;
     final side = direction == SwipeDirection.right ? 1 : -1;
-    await _animateTo(Offset(side * width * 1.4, _offset.dy + 40), Curves.easeIn);
+    await _animateTo(Offset(side * width * 1.4, _offset.dy + 40), Motion.exit);
     if (!mounted) return;
     final person = widget.cards.first;
     setState(() {
@@ -204,9 +204,10 @@ class _Stamp extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
               decoration: BoxDecoration(
                 color: color,
-                border: Border.all(color: Palette.ink, width: 2.5),
+                borderRadius: Frame.tagRadius,
+                border: Border.all(color: Palette.onGold, width: 2.5),
               ),
-              child: Text(text.toUpperCase(), style: AppType.title(size: 30)),
+              child: Text(text.toUpperCase(), style: AppType.title(size: 30, color: Palette.onGold)),
             ),
           ),
         ),

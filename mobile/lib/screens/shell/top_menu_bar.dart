@@ -1,10 +1,11 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../../state/appearance.dart';
 import '../../state/session.dart';
 import '../../ui/ui.dart';
 import '../profile/profile_screen.dart';
 
-/// The menu bar across the top: logo, CREWMATCH, and a slot on the right.
+/// The header across the top: logo, CrewMatch, and a slot on the right.
 class TopMenuBar extends StatelessWidget {
   const TopMenuBar({super.key, this.trailing});
 
@@ -13,47 +14,41 @@ class TopMenuBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        height: 44,
-        decoration: const BoxDecoration(
-          color: Palette.window,
-          border: Border(top: Frame.side, bottom: Frame.side),
+    height: 56,
+    padding: const EdgeInsets.only(left: 12),
+    color: Palette.desktop,
+    child: Row(
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: const BoxDecoration(
+            color: Palette.crimson,
+            borderRadius: Frame.buttonRadius,
+          ),
+          child: const Center(
+            child: GlyphIcon(Glyph.logo, size: 20, color: Palette.onCrimson),
+          ),
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const ColoredBox(
-              color: Palette.ink,
-              child: SizedBox(
-                width: 44,
-                child: Center(child: GlyphIcon(Glyph.logo, size: 22, color: Palette.cream)),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Semantics(
+                header: true,
+                child: Text('CrewMatch', style: AppType.title(size: 20)),
               ),
             ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Semantics(
-                    header: true,
-                    child: Text(
-                      'CREWMATCH',
-                      style: AppType.label(size: 22, color: Palette.ink).copyWith(letterSpacing: 1.8),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            if (trailing != null)
-              DecoratedBox(
-                decoration: const BoxDecoration(border: Border(left: Frame.side)),
-                child: trailing,
-              ),
-          ],
+          ),
         ),
-      );
+        ?trailing,
+      ],
+    ),
+  );
 }
 
-/// A VT323 text slot for the menu bar, e.g. today's date.
+/// A small text slot for the header, e.g. today's date.
 class MenuBarText extends StatelessWidget {
   const MenuBarText(this.text, {super.key});
 
@@ -61,29 +56,26 @@ class MenuBarText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        child: Center(child: Label(text, size: 21, color: Palette.ink)),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 14),
+    child: Center(child: Label(text, size: 19, color: Palette.muted)),
+  );
 }
 
-/// A pink LOG OUT button for the menu bar.
+/// A LOG OUT button for the header.
 class LogOutButton extends StatelessWidget {
   const LogOutButton({super.key});
 
   @override
-  Widget build(BuildContext context) => Material(
-        color: Palette.pink,
-        child: InkWell(
-          onTap: () => context.session.signOut(),
-          child: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 14),
-            child: Center(child: Label('Log out', size: 21, color: Palette.ink)),
-          ),
-        ),
-      );
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(right: 8),
+    child: TextButton(
+      onPressed: () => context.session.signOut(),
+      child: const Text('Log out'),
+    ),
+  );
 }
 
-enum _AccountAction { profile, signOut }
+enum _AccountAction { profile, light, dark, system, signOut }
 
 /// The avatar on the right of the menu bar, opening Profile / Log out.
 class AccountMenu extends StatelessWidget {
@@ -100,18 +92,36 @@ class AccountMenu extends StatelessWidget {
         switch (action) {
           case _AccountAction.profile:
             Navigator.of(context).push(ProfileScreen.route());
+          case _AccountAction.light:
+            Appearance.instance.choose(ThemeMode.light);
+          case _AccountAction.dark:
+            Appearance.instance.choose(ThemeMode.dark);
+          case _AccountAction.system:
+            Appearance.instance.choose(ThemeMode.system);
           case _AccountAction.signOut:
             context.session.signOut();
         }
       },
-      itemBuilder: (context) => const [
-        PopupMenuItem(value: _AccountAction.profile, child: Text('PROFILE')),
-        PopupMenuItem(value: _AccountAction.signOut, child: Text('LOG OUT')),
-      ],
+      itemBuilder: (context) {
+        final mode = Appearance.instance.value;
+        return [
+          const PopupMenuItem(value: _AccountAction.profile, child: Text('Profile')),
+          const PopupMenuDivider(),
+          CheckedPopupMenuItem(value: _AccountAction.light, checked: mode == ThemeMode.light, child: const Text('Light')),
+          CheckedPopupMenuItem(value: _AccountAction.dark, checked: mode == ThemeMode.dark, child: const Text('Dark')),
+          CheckedPopupMenuItem(value: _AccountAction.system, checked: mode == ThemeMode.system, child: const Text('Match phone')),
+          const PopupMenuDivider(),
+          const PopupMenuItem(value: _AccountAction.signOut, child: Text('Log out')),
+        ];
+      },
       child: SizedBox(
         width: 56,
         child: Center(
-          child: Avatar(url: user?.avatar ?? '', name: user?.name ?? '', size: 28),
+          child: Avatar(
+            url: user?.avatar ?? '',
+            name: user?.name ?? '',
+            size: 34,
+          ),
         ),
       ),
     );

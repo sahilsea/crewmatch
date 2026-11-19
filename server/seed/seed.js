@@ -8,6 +8,8 @@ import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import Crew from '../models/Crew.js';
 import Event from '../models/Event.js';
+import Post from '../models/Post.js';
+import Message from '../models/Message.js';
 import { OPTIONS, MAX_CREW_SIZE } from '../config/options.js';
 
 export const SEED_PASSWORD = 'password123';
@@ -293,8 +295,55 @@ async function seedEvents(crewIds) {
   return Event.create(docs);
 }
 
+// Feed posts: [author, crew key or null, minutes ago, tag, text, likers, comments [author, text]].
+const POSTS = [
+  ['Diya Patel', 'night', 12, 'win', 'We just demoed our campus marketplace to the judges 🚀 Come try it at Table 14!', 9,
+    [['Riya Banerjee', 'The checkout flow is so smooth 🔥'], ['Nisha Verma', 'Coming over after the quiz!']]],
+  ['Riya Banerjee', 'pixel', 40, 'looking', 'Need a backend dev who loves Node. We have a designer and a pitcher already. DM me!', 4,
+    [['Farhan Ali', 'What are you building?']]],
+  ['Nisha Verma', 'null', 65, null, 'The check-in code hunt on the expo floor was pure chaos 😂', 7,
+    [['Zoya Khan', 'We found it in 2 minutes 😎']]],
+  ['Zoya Khan', 'chai', 110, 'update', 'Chai count: 14. Commits: 61. Sleep: optional.', 12, []],
+  ['Aditya Menon', 'gradient', 190, 'update', 'Our model finally beats the baseline. Pitch practice at 6 in Lab 2 if anyone wants feedback.', 5,
+    [['Saanvi Joshi', 'We’ll be there!']]],
+];
+
+// A short history in each seeded crew's chat. [author index, minutes ago, text]
+const CHAT = [
+  [0, 95, 'Who’s taking the demo video?'],
+  [1, 92, 'I can, after lunch'],
+  [0, 60, 'Stall Hop code is up near the expo hall 👀'],
+  [1, 58, 'On my way'],
+];
+
+async function seedFeed(crewIds) {
+  const people = await User.find({ name: { $in: CREWS.flatMap((c) => c.members) } }, 'name');
+  const idOf = new Map(people.map((u) => [u.name, u._id]));
+  const crewName = Object.fromEntries(CREWS.map((c) => [c.key, c.name]));
+  const now = Date.now();
+  const ids = people.map((u) => u._id);
+  await Post.insertMany(POSTS.map(([author, crew, ago, tag, text, likes, comments]) => ({
+    author: idOf.get(author),
+    crewName: crew ? crewName[crew] : null,
+    text,
+    tag,
+    likes: ids.filter((id) => !id.equals(idOf.get(author))).slice(0, likes),
+    comments: comments.map(([who, t], i) => ({ author: idOf.get(who), text: t, createdAt: new Date(now - (ago - 5 - i) * MINUTE) })),
+    createdAt: new Date(now - ago * MINUTE),
+    updatedAt: new Date(now - ago * MINUTE),
+  })));
+
+  const crews = CREWS.map((c) => ({ id: crewIds[c.key], members: c.members.map((n) => idOf.get(n)) }));
+  await Message.insertMany(crews.flatMap((crew) => CHAT.map(([who, ago, text]) => ({
+    crew: crew.id,
+    author: crew.members[who % crew.members.length],
+    text,
+    createdAt: new Date(now - ago * MINUTE),
+  }))));
+}
+
 export async function seedDatabase() {
-  await Promise.all([User.deleteMany({}), Crew.deleteMany({}), Event.deleteMany({})]);
+  await Promise.all([User.deleteMany({}), Crew.deleteMany({}), Event.deleteMany({}), Post.deleteMany({}), Message.deleteMany({})]);
 
   // Insert with one shared hash: insertMany skips the save hook, and hashing 30 times is slow.
   const password = await bcrypt.hash(SEED_PASSWORD, 10);
@@ -307,6 +356,7 @@ export async function seedDatabase() {
 
   const crewIds = await seedCrews();
   const events = await seedEvents(crewIds);
+  await seedFeed(crewIds);
 
   console.log(`Seeded ${docs.length} users. Every seeded account's password: ${SEED_PASSWORD}`);
   console.log('Demo logins: web@crewmatch.dev, mobile@crewmatch.dev, admin@crewmatch.dev');

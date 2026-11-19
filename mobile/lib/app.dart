@@ -4,6 +4,7 @@ import 'screens/admin/admin_notice_screen.dart';
 import 'screens/auth/sign_in_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/shell/home_shell.dart';
+import 'state/appearance.dart';
 import 'state/session.dart';
 import 'ui/ui.dart';
 import 'ui/theme.dart';
@@ -17,12 +18,19 @@ class CrewMatchApp extends StatefulWidget {
   State<CrewMatchApp> createState() => _CrewMatchAppState();
 }
 
-class _CrewMatchAppState extends State<CrewMatchApp> {
-  final _navigator = GlobalKey<NavigatorState>();
+class _CrewMatchAppState extends State<CrewMatchApp> with WidgetsBindingObserver {
+  var _navigator = GlobalKey<NavigatorState>();
+
+  /// Bumped when the theme flips. The whole app is rebuilt under a new key
+  /// so every colour is read again (see [Tone]); the open tab is kept.
+  var _generation = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    Appearance.instance.addListener(_onAppearanceChanged);
+    Palette.isDark = _wantsDark();
     widget.session
       ..addListener(_onSessionChanged)
       ..restore();
@@ -30,9 +38,30 @@ class _CrewMatchAppState extends State<CrewMatchApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    Appearance.instance.removeListener(_onAppearanceChanged);
     widget.session.removeListener(_onSessionChanged);
     super.dispose();
   }
+
+  bool _wantsDark() => switch (Appearance.instance.value) {
+        ThemeMode.dark => true,
+        ThemeMode.light => false,
+        ThemeMode.system => WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark,
+      };
+
+  void _onAppearanceChanged() {
+    final dark = _wantsDark();
+    if (dark == Palette.isDark) return;
+    setState(() {
+      Palette.isDark = dark;
+      _generation++;
+      _navigator = GlobalKey<NavigatorState>();
+    });
+  }
+
+  @override
+  void didChangePlatformBrightness() => _onAppearanceChanged();
 
   /// Signed out (or the token expired) on a pushed screen: back to the root,
   /// where [_RootGate] now shows sign-in.
@@ -46,12 +75,13 @@ class _CrewMatchAppState extends State<CrewMatchApp> {
   Widget build(BuildContext context) => SessionScope(
         session: widget.session,
         child: MaterialApp(
+          key: ValueKey(_generation),
           title: 'CrewMatch',
           navigatorKey: _navigator,
           debugShowCheckedModeBanner: false,
           theme: buildTheme(),
           scrollBehavior: const AppScrollBehavior(),
-          // Phone-shaped on a wide browser window, with the pink desktop around it.
+          // Phone-shaped on a wide browser window, with the page colour around it.
           builder: (context, child) => ColoredBox(
             color: Palette.desktop,
             child: Center(

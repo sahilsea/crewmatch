@@ -5,7 +5,10 @@ import '../../models/user.dart';
 import '../../ui/ui.dart';
 import '../../util/labels.dart';
 
-/// The crew's name, size, score and members, with rename and leave.
+enum _CrewAction { rename, leave }
+
+/// The crew's summary card (name, points, rank, size) and its members, with
+/// rename and leave in the card's menu.
 class CrewWindow extends StatelessWidget {
   const CrewWindow({
     super.key,
@@ -13,126 +16,192 @@ class CrewWindow extends StatelessWidget {
     required this.myId,
     required this.onRename,
     required this.onLeave,
+    required this.onRemove,
+    this.chat,
   });
+
+  /// The crew chat card, under the summary.
+  final Widget? chat;
 
   final Crew crew;
   final String? myId;
   final VoidCallback onRename;
   final VoidCallback onLeave;
 
+  /// Takes another member out. Only offered while the crew has more than two.
+  final ValueChanged<User> onRemove;
+
   @override
-  Widget build(BuildContext context) {
-    final spots = crew.spotsLeft;
-    return RetroWindow(
-      title: 'Crew',
-      inset: false,
-      child: Column(
+  Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 14,
         children: [
-          DecoratedBox(
-            decoration: const BoxDecoration(border: Border(bottom: Frame.side)),
-            child: Halftone(
-              color: Palette.blue,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 12, 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(crew.name, style: AppType.headline(size: 34)),
-                    Row(
+          Rise(
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(18, 10, 8, 18),
+              decoration: const BoxDecoration(color: Palette.pink, borderRadius: Frame.radius),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: 12,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          crew.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppType.title(size: 26, color: Palette.onPink),
+                        ),
+                      ),
+                      PopupMenuButton<_CrewAction>(
+                        tooltip: 'Crew options',
+                        icon: const Icon(Icons.more_vert_rounded, color: Palette.muted),
+                        onSelected: (action) => switch (action) {
+                          _CrewAction.rename => onRename(),
+                          _CrewAction.leave => onLeave(),
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(value: _CrewAction.rename, child: Text('Rename crew')),
+                          PopupMenuItem(value: _CrewAction.leave, child: Text('Leave crew')),
+                        ],
+                      ),
+                    ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: Row(
+                      spacing: 8,
                       children: [
+                        Expanded(child: _Stat(label: 'Points', child: CountUp(crew.points, style: _statStyle))),
+                        Expanded(child: _Stat(label: 'Rank', child: Text(crew.rank == null ? '–' : '#${crew.rank}', style: _statStyle))),
                         Expanded(
-                          child: Label(
-                            '${crew.members.length} of ${Crew.maxSize}'
-                            '${spots > 0 ? ' · ${plural(spots, 'spot')} left' : ' · full'}',
-                            size: 18,
-                            color: Palette.ink,
+                          child: _Stat(
+                            label: 'Members',
+                            child: Text('${crew.members.length}/${Crew.maxSize}', style: _statStyle),
                           ),
                         ),
-                        TextButton(onPressed: onRename, child: const Text('Rename')),
-                        const SizedBox(width: 6),
-                        DashedButton(label: 'Leave', onPressed: onLeave),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
-          _ScoreStrip(crew: crew),
-          for (final (i, member) in crew.members.indexed) ...[
-            if (i > 0) const DashedLine(),
-            _MemberRow(member: member, isMe: member.id == myId),
-          ],
+          ?chat,
+          Column(
+            children: [
+              for (final (i, member) in crew.members.indexed)
+                Rise(
+                  key: ValueKey(member.id),
+                  delay: Motion.stagger(i + 1),
+                  child: _MemberRow(
+                    member: member,
+                    isMe: member.id == myId,
+                    onRemove: member.id != myId && crew.members.length > 2 ? () => onRemove(member) : null,
+                  ),
+                ),
+              for (var i = 0; i < crew.spotsLeft; i++)
+                Rise(delay: Motion.stagger(crew.members.length + i + 1), child: const _OpenSpot()),
+            ],
+          ),
         ],
-      ),
-    );
-  }
+      );
+
+  static final _statStyle = AppType.body(size: 22, weight: FontWeight.w700);
 }
 
-/// Dark strip with the crew's hackathon points and leaderboard rank.
-class _ScoreStrip extends StatelessWidget {
-  const _ScoreStrip({required this.crew});
+class _Stat extends StatelessWidget {
+  const _Stat({required this.label, required this.child});
 
-  final Crew crew;
+  final String label;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) => Container(
-        color: Palette.dark,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Row(
-          children: [
-            const Expanded(child: Label('Hackathon score', color: Palette.darkMuted)),
-            Label('${crew.points} pts', size: 24, color: Palette.cream),
-            if (crew.rank case final rank?) ...[
-              const SizedBox(width: 10),
-              InkBadge('Rank #$rank', inverted: true),
-            ],
-          ],
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: const BoxDecoration(color: Palette.desktop, borderRadius: Frame.buttonRadius),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 2,
+          children: [child, Text(label, style: AppType.body(size: 12, color: Palette.muted))],
         ),
       );
 }
 
 class _MemberRow extends StatelessWidget {
-  const _MemberRow({required this.member, required this.isMe});
+  const _MemberRow({required this.member, required this.isMe, this.onRemove});
 
   final User member;
   final bool isMe;
+  final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) {
     final email = member.email;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       child: Row(
-        spacing: 12,
+        spacing: 14,
         children: [
-          Avatar(url: member.avatar, name: member.name, size: 42),
+          Avatar(url: member.avatar, name: member.name, size: 44, background: isMe ? Palette.gold : Palette.pink),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              spacing: 2,
               children: [
                 Row(
-                  spacing: 6,
+                  spacing: 8,
                   children: [
                     Flexible(
                       child: Text(
                         member.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: AppType.body(size: 15.5, weight: FontWeight.w600),
+                        style: AppType.body(size: 16, weight: FontWeight.w500),
                       ),
                     ),
                     if (isMe) const InkBadge('You'),
                   ],
                 ),
-                Label(roleAndSkill(member), size: 16, color: Palette.mutedDark),
+                Text(roleAndSkill(member), style: AppType.body(size: 14, color: Palette.muted)),
               ],
             ),
           ),
           if (!isMe && email != null) CopyText(email, label: 'Email'),
+          if (onRemove != null)
+            IconButton(
+              tooltip: 'Remove ${member.name}',
+              onPressed: onRemove,
+              icon: const Icon(Icons.person_remove_outlined, size: 22, color: Palette.muted),
+            ),
         ],
       ),
     );
   }
+}
+
+/// An empty seat: a dashed circle whose outline glows gold now and then.
+class _OpenSpot extends StatelessWidget {
+  const _OpenSpot();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        child: Row(
+          spacing: 14,
+          children: [
+            const Pulse(
+              minScale: 0.92,
+              period: Duration(milliseconds: 1000),
+              child: DashedBorder(
+                radius: 22,
+                color: Palette.dashed,
+                child: SizedBox.square(dimension: 44),
+              ),
+            ),
+            Text('Open', style: AppType.body(size: 15, color: Palette.muted)),
+          ],
+        ),
+      );
 }

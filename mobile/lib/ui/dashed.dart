@@ -18,7 +18,7 @@ class DashedLine extends StatelessWidget {
 
 /// Draws a dashed rounded rectangle on top of [child].
 class DashedBorder extends StatelessWidget {
-  const DashedBorder({super.key, required this.child, this.radius = 6, this.color = Palette.ink});
+  const DashedBorder({super.key, required this.child, this.radius = 22, this.color = Palette.ink});
 
   final Widget child;
   final double radius;

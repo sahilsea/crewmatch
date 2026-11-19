@@ -3,62 +3,85 @@ import 'package:material_ui/material_ui.dart';
 
 import 'palette.dart';
 
-/// The four typefaces of the retro desktop look, from Google Fonts.
+/// The two typefaces of the wizarding-school look, from Google Fonts:
+/// Cinzel for titles and headlines, Roboto for everything you read.
 abstract final class AppType {
   /// Fonts are fetched from Google Fonts at runtime and cached on the device.
   /// Widget tests switch this off so they never touch the network.
   static bool fetchFonts = true;
 
-  /// Window titles: Anton, set in uppercase.
-  static TextStyle title({double size = 20, Color color = Palette.ink}) => _font(
-        GoogleFonts.anton,
-        'Anton',
-        TextStyle(fontSize: size, letterSpacing: 0.6, height: 1.15, color: color),
+  /// Card and screen titles: Cinzel bold.
+  static TextStyle title({double size = 20, Color color = Palette.ink}) =>
+      _font(
+        GoogleFonts.cinzel,
+        'Cinzel',
+        TextStyle(
+          fontSize: size,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.3,
+          height: 1.08,
+          color: color,
+        ),
       );
 
-  /// Big serif headlines and names: Old Standard TT bold.
-  static TextStyle headline({double size = 30, Color color = Palette.ink}) => _font(
-        GoogleFonts.oldStandardTt,
-        'Old Standard TT',
-        TextStyle(fontSize: size, fontWeight: FontWeight.w700, height: 1.05, color: color),
+  /// Big headlines and names: Cinzel bold, a little smaller than the old
+  /// serif because its capitals run wide.
+  static TextStyle headline({double size = 30, Color color = Palette.ink}) =>
+      _font(
+        GoogleFonts.cinzel,
+        'Cinzel',
+        TextStyle(
+          fontSize: size * 0.82,
+          fontWeight: FontWeight.w700,
+          height: 1.08,
+          color: color,
+        ),
       );
 
-  /// Body copy and buttons: Pixelify Sans.
+  /// Body copy and buttons: Roboto.
   static TextStyle body({
     double size = 15,
     FontWeight weight = FontWeight.w400,
     Color color = Palette.ink,
     double height = 1.4,
-  }) =>
+  }) => _font(
+    GoogleFonts.roboto,
+    'Roboto',
+    TextStyle(
+      fontSize: size,
+      fontWeight: weight,
+      height: height,
+      color: color,
+      fontFeatures: _noLigatures,
+    ),
+  );
+
+  /// Kept off from the pixel-font days; harmless with Roboto.
+  static const _noLigatures = <FontFeature>[];
+
+  /// Labels, meta, numbers and status lines: small Roboto caps. Callers
+  /// still pass the old terminal-font sizes, which ran small, so they are
+  /// scaled down to match.
+  static TextStyle label({double size = 17, Color color = Palette.muted}) =>
       _font(
-        GoogleFonts.pixelifySans,
-        'Pixelify Sans',
+        GoogleFonts.roboto,
+        'Roboto',
         TextStyle(
-          fontSize: size,
-          fontWeight: weight,
-          height: height,
+          fontSize: size * 0.72,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0.6,
+          height: 1.25,
           color: color,
-          fontFeatures: _noLigatures,
         ),
       );
 
-  /// Pixelify Sans draws a broken glyph for its "fi" ligature ("fits first"
-  /// comes out wrong), so ligatures stay off wherever it is used.
-  static const _noLigatures = [FontFeature.disable('liga'), FontFeature.disable('calt')];
-
-  /// Labels, meta, numbers and status lines: VT323, set in uppercase.
-  static TextStyle label({double size = 17, Color color = Palette.muted}) => _font(
-        GoogleFonts.vt323,
-        'VT323',
-        TextStyle(fontSize: size, letterSpacing: 0.9, height: 1.1, color: color),
-      );
-
-  /// Material's text theme in Pixelify Sans, without ligatures.
+  /// Material's text theme in Roboto.
   static TextTheme textTheme(TextTheme base) {
     final theme = fetchFonts
-        ? GoogleFonts.pixelifySansTextTheme(base)
-        : base.apply(fontFamily: 'Pixelify Sans');
-    TextStyle? plain(TextStyle? style) => style?.copyWith(fontFeatures: _noLigatures);
+        ? GoogleFonts.robotoTextTheme(base)
+        : base.apply(fontFamily: 'Roboto');
+    TextStyle? plain(TextStyle? style) =>
+        style?.copyWith(fontFeatures: _noLigatures);
     return theme.copyWith(
       displayLarge: plain(theme.displayLarge),
       displayMedium: plain(theme.displayMedium),
@@ -82,11 +105,12 @@ abstract final class AppType {
     TextStyle Function({TextStyle? textStyle}) googleFont,
     String family,
     TextStyle style,
-  ) =>
-      fetchFonts ? googleFont(textStyle: style) : style.copyWith(fontFamily: family);
+  ) => fetchFonts
+      ? googleFont(textStyle: style)
+      : style.copyWith(fontFamily: family);
 }
 
-/// A VT323 label, always uppercase: meta lines, counters, status text.
+/// A small-caps label, always uppercase: meta lines, counters, status text.
 class Label extends StatelessWidget {
   const Label(
     this.text, {
@@ -105,10 +129,10 @@ class Label extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Text(
-        text.toUpperCase(),
-        style: AppType.label(size: size, color: color),
-        maxLines: maxLines,
-        overflow: maxLines == null ? null : TextOverflow.ellipsis,
-        textAlign: textAlign,
-      );
+    text.toUpperCase(),
+    style: AppType.label(size: size, color: color),
+    maxLines: maxLines,
+    overflow: maxLines == null ? null : TextOverflow.ellipsis,
+    textAlign: textAlign,
+  );
 }

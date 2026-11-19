@@ -7,7 +7,12 @@ import 'palette.dart';
 /// A flat fill with a halftone dot screen printed over it, like an old
 /// photocopy. Used behind profile photos and in coloured header bands.
 class Halftone extends StatelessWidget {
-  const Halftone({super.key, required this.color, this.child, this.opacity = 0.28});
+  const Halftone({
+    super.key,
+    required this.color,
+    this.child,
+    this.opacity = 0.28,
+  });
 
   final Color color;
   final Widget? child;
@@ -17,17 +22,24 @@ class Halftone extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DecoratedBox(
-        decoration: BoxDecoration(color: color),
-        child: CustomPaint(
-          painter: HalftonePainter(color: Palette.ink.withValues(alpha: opacity)),
-          child: child,
-        ),
-      );
+    // Flat colour now; the dot pattern belonged to the old retro look.
+    decoration: BoxDecoration(
+      color: color == Palette.gold ? Palette.pink : color,
+    ),
+    child: CustomPaint(
+      painter: const HalftonePainter(color: Color(0x00000000)),
+      child: child,
+    ),
+  );
 }
 
 /// Paints 1px dots on a 4px grid.
 class HalftonePainter extends CustomPainter {
-  const HalftonePainter({required this.color, this.spacing = 4, this.dotSize = 2});
+  const HalftonePainter({
+    required this.color,
+    this.spacing = 4,
+    this.dotSize = 2,
+  });
 
   final Color color;
   final double spacing;

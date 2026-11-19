@@ -22,7 +22,7 @@ class SkillsField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Fieldset(
-        legend: 'Skills (type, then enter)',
+        legend: 'Skills',
         error: error,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

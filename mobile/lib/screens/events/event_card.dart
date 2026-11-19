@@ -80,37 +80,108 @@ class _EventCardState extends State<EventCard> {
     final e = widget.event;
     final now = DateTime.now();
     final actions = _actions(now);
+    final status = _statusLine(e);
+    final live = e.state == EventState.live;
     return Container(
-      decoration: const BoxDecoration(color: Palette.inset, border: Frame.border),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Palette.window,
+        borderRadius: Frame.radius,
+        border: Frame.border,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 12,
         children: [
-          _Header(event: e),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              spacing: 5,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            spacing: 12,
+            children: [
+              _DateBlock(date: e.startsAt.toLocal(), live: live),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  spacing: 4,
+                  children: [
+                    Row(
+                      spacing: 8,
+                      children: [
+                        switch (e.state) {
+                          EventState.live => const LivePill(),
+                          EventState.upcoming => const SizedBox.shrink(),
+                          EventState.ended => const InkBadge('Ended'),
+                        },
+                        Flexible(
+                          child: Text(
+                            _capitalized(e.category.isEmpty ? e.kind.name : e.category),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppType.body(size: 12, weight: FontWeight.w500, color: Palette.muted),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(e.title, style: AppType.body(size: 16, weight: FontWeight.w700, height: 1.3)),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      spacing: 4,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(top: 1),
+                          child: Icon(Icons.place_outlined, size: 14, color: Palette.muted),
+                        ),
+                        Expanded(
+                          child: Text(
+                            '${e.location} · ${scheduleLine(e, now)}',
+                            style: AppType.body(size: 13, color: Palette.muted),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (_expanded) ...[
+            if (e.summary.isNotEmpty) Text(e.summary, style: AppType.body(size: 14.5)),
+            if (e.details.isNotEmpty) Text(e.details, style: AppType.body(size: 14, color: Palette.muted)),
+            Text(countdown(e, now), style: AppType.body(size: 13, color: Palette.muted)),
+            _Capacity(event: e),
+          ],
+          if (status case (final text, final detail, final color)) _StatusLine(status: text, detail: detail, color: color),
+          Row(
+            children: [
+              InfoTag('+${e.points} pts', icon: Icons.bolt_rounded),
+              const SizedBox(width: 6),
+              TextButton(
+                onPressed: () => setState(() => _expanded = !_expanded),
+                child: Text(_expanded ? 'Less' : 'More'),
+              ),
+              const Spacer(),
+              if (e.isCompleted)
+                Flexible(
+                  child: PopIn(child: _Stamp(e.isChallenge ? 'Approved · +${e.myEntry!.pointsAwarded}' : 'Checked in · +${e.myEntry!.pointsAwarded}')),
+                ),
+            ],
+          ),
+          // Actions get their own full-width row so two never push off-screen.
+          if (!e.isCompleted && actions.isNotEmpty)
+            Row(
+              spacing: 8,
               children: [
-                Text(e.title, style: AppType.headline(size: 22)),
-                if (e.summary.isNotEmpty) Text(e.summary, style: AppType.body(size: 14.5)),
-                if (e.details.isNotEmpty) ...[
-                  if (_expanded) Text(e.details, style: AppType.body(size: 14, color: Palette.mutedDark)),
-                  TextButton(
-                    onPressed: () => setState(() => _expanded = !_expanded),
-                    style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(44, 36)),
-                    child: Text(_expanded ? 'Less' : 'More'),
+                for (final action in actions)
+                  Expanded(
+                    child: action.color == Palette.inset
+                        ? OutlinedButton(onPressed: action.onPressed, child: Text(action.label, maxLines: 1, overflow: TextOverflow.ellipsis))
+                        : FilledButton(
+                            onPressed: action.onPressed,
+                            style: FilledButton.styleFrom(minimumSize: const Size(64, 48)),
+                            child: Text(action.label, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ),
                   ),
-                ],
-                Label('${e.location} · ${scheduleLine(e, now)}', size: 16, color: Palette.ink),
-                Label(countdown(e, now), size: 16, color: Palette.mutedDark),
-                _Capacity(event: e),
               ],
             ),
-          ),
-          if (_statusLine(e) case (final status, final detail, final color))
-            _StatusLine(status: status, detail: detail, color: color),
-          if (actions.isNotEmpty) SegmentRow(segments: actions, height: 48),
         ],
       ),
     );
@@ -120,15 +191,13 @@ class _EventCardState extends State<EventCard> {
   /// reviewer's note, shown as typed), and the colour to show it in.
   static (String, String?, Color)? _statusLine(HubEvent e) {
     final entry = e.myEntry;
-    if (entry == null) return e.isFull ? ('Full · no spots left', null, Palette.strip) : null;
-    final points = '+${entry.pointsAwarded} pts';
+    if (entry == null) return e.isFull ? ('Full', null, Palette.strip) : null;
     return switch (entry.status) {
-      EntryStatus.completed =>
-        (e.isChallenge ? '✓ Approved · $points' : '✓ Checked in · $points', null, Palette.blue),
+      EntryStatus.completed => null,
       EntryStatus.submitted => ('In review', entry.submissionUrl, Palette.strip),
       EntryStatus.joined when entry.wasSentBack => ('Sent back', entry.note, Palette.pink),
       EntryStatus.joined => (
-          e.isChallenge ? 'Accepted · submit a link before the deadline' : '✓ Your crew is going',
+          e.isChallenge ? 'Accepted' : '✓ Going',
           null,
           Palette.strip,
         ),
@@ -136,33 +205,50 @@ class _EventCardState extends State<EventCard> {
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header({required this.event});
+/// The day and date in a small tile, warmer when the event is live.
+class _DateBlock extends StatelessWidget {
+  const _DateBlock({required this.date, required this.live});
 
-  final HubEvent event;
+  final DateTime date;
+  final bool live;
+
+  static const _days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
   @override
-  Widget build(BuildContext context) => DecoratedBox(
-        decoration: const BoxDecoration(border: Border(bottom: Frame.side)),
-        child: Halftone(
-          color: event.isChallenge ? Palette.pink : Palette.blue,
-          opacity: 0.2,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            child: Row(
-              spacing: 8,
-              children: [
-                InkBadge(event.category.isEmpty ? event.kind.name : event.category),
-                switch (event.state) {
-                  EventState.live => const LivePill(),
-                  EventState.upcoming => const Label('Upcoming', color: Palette.ink),
-                  EventState.ended => const Label('Ended', color: Palette.mutedDark),
-                },
-                const Spacer(),
-                Label('+${event.points} pts', size: 20, color: Palette.ink),
-              ],
-            ),
-          ),
+  Widget build(BuildContext context) => Container(
+        width: 54,
+        height: 58,
+        decoration: BoxDecoration(
+          color: live ? Palette.pink : Palette.high,
+          borderRadius: Frame.buttonRadius,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(_days[date.weekday - 1], style: AppType.body(size: 11, weight: FontWeight.w500)),
+            Text('${date.day}', style: AppType.body(size: 20, weight: FontWeight.w700, height: 1.1)),
+          ],
+        ),
+      );
+}
+
+/// The navy "Checked in · +40" stamp on a finished event.
+class _Stamp extends StatelessWidget {
+  const _Stamp(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: const BoxDecoration(color: Palette.navy, borderRadius: Frame.chipRadius),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          spacing: 6,
+          children: [
+            const Icon(Icons.check_rounded, size: 16, color: Palette.cream),
+            Flexible(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.body(size: 14, weight: FontWeight.w500, color: Palette.cream))),
+          ],
         ),
       );
 }
@@ -197,11 +283,11 @@ class _StatusLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(color: color, border: const Border(top: Frame.side)),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(color: color == Palette.blue ? Palette.pink : color, borderRadius: Frame.chipRadius),
         child: Text.rich(
           TextSpan(
-            text: status.toUpperCase(),
+            text: status,
             children: [
               if (detail != null && detail!.isNotEmpty)
                 TextSpan(text: ': $detail', style: AppType.body(size: 14)),
@@ -209,7 +295,9 @@ class _StatusLine extends StatelessWidget {
           ),
           maxLines: 4,
           overflow: TextOverflow.ellipsis,
-          style: AppType.label(size: 17, color: Palette.ink),
+          style: AppType.body(size: 14, weight: FontWeight.w500),
         ),
       );
 }
+
+String _capitalized(String text) => text.isEmpty ? text : '${text[0].toUpperCase()}${text.substring(1)}';

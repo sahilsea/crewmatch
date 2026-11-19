@@ -686,3 +686,131 @@ describe('CORS', () => {
     assert.equal(await allowOrigin('http://localhost.evil.example.com:80'), null);
   });
 });
+
+describe('hackathon switcher', () => {
+  test('lists every hackathon with your rank at each, never a combined rank', async () => {
+    const token = await login('web@crewmatch.dev');
+    const { hackathons, record } = (await api('GET', '/hackathons', { token })).body;
+    assert.equal(hackathons[0].id, 'current');
+    assert.equal(hackathons[0].name, 'Test Hack 2026');
+    assert.equal(hackathons[0].status, 'live');
+    const past = hackathons.filter((h) => h.status === 'ended');
+    assert.deepEqual(past.map((h) => h.myRank), [6, 12]);
+    assert.equal(hackathons.find((h) => h.status === 'upcoming').myRank, null);
+    // No crew at the live one yet, so only the two past ones count.
+    assert.deepEqual(record, { hackathons: 2, bestFinish: 6, totalPoints: 480 });
+  });
+
+  test('a past board marks your crew there; the live board matches /leaderboard', async () => {
+    const token = await login('web@crewmatch.dev');
+    const past = (await api('GET', '/hackathons/devfest-hack-mumbai-2026/leaderboard', { token })).body;
+    assert.equal(past.crews.find((c) => c.id === past.myCrewId).name, 'Stack Smashers');
+    assert.ok(past.crews.every((c) => !('memberEmails' in c)), 'emails stay on the server');
+
+    const live = (await api('GET', '/hackathons/current/leaderboard', { token })).body;
+    const plain = (await api('GET', '/leaderboard', { token })).body;
+    assert.deepEqual(live.crews.map((c) => c.id), plain.crews.map((c) => c.id));
+
+    assert.equal((await api('GET', '/hackathons/nope/leaderboard', { token })).status, 404);
+  });
+});
+
+describe('removing a crew member', () => {
+  test('frees their spot, but never empties the crew or removes yourself', async () => {
+    const crew = await newCrew('Trim Team');
+    const c = await newUser();
+    await api('POST', '/swipe', { token: crew.a.token, body: { targetId: c.id, direction: 'right' } });
+    await api('POST', '/swipe', { token: c.token, body: { targetId: crew.a.id, direction: 'right' } });
+    assert.equal((await api('POST', '/crews/mine/members', { token: crew.a.token, body: { userId: c.id } })).status, 200);
+
+    const removed = await api('DELETE', `/crews/mine/members/${c.id}`, { token: crew.a.token });
+    assert.equal(removed.status, 200);
+    assert.deepEqual(removed.body.crew.members.map((m) => m.id).sort(), [crew.a.id, crew.b.id].sort());
+    assert.equal((await api('GET', '/crews/mine', { token: c.token })).body.crew, null);
+
+    assert.equal((await api('DELETE', `/crews/mine/members/${crew.b.id}`, { token: crew.a.token })).status, 409);
+    assert.equal((await api('DELETE', `/crews/mine/members/${crew.a.id}`, { token: crew.a.token })).status, 400);
+    assert.equal((await api('DELETE', `/crews/mine/members/${c.id}`, { token: crew.a.token })).status, 404);
+  });
+});
+
+// A 1×1 PNG.
+const PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+
+describe('hackathon feed', () => {
+  test('seeded posts come newest first with like and comment counts', async () => {
+    const token = await login('web@crewmatch.dev');
+    const { posts } = (await api('GET', '/posts', { token })).body;
+    assert.ok(posts.length >= 5);
+    const times = posts.map((p) => new Date(p.createdAt).getTime());
+    assert.deepEqual(times, [...times].sort((a, b) => b - a));
+    assert.ok(posts[0].likeCount > 0 && posts[0].commentCount === 2 && posts[0].comments.length === 2);
+    assert.equal(posts[0].author.name, 'Diya Patel');
+  });
+
+  test('post with a photo, like, comment and delete', async () => {
+    const crew = await newCrew('Feed Crew');
+    const created = await api('POST', '/posts', { token: crew.a.token, body: { text: 'Shipped!', tag: 'win', photo: PIXEL } });
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    const { post } = created.body;
+    assert.equal(post.crewName, 'Feed Crew');
+    assert.match(post.photoUrl, /^\/api\/photos\/[0-9a-f]{24}$/);
+
+    // Photos load without a token, so images can show them.
+    const photo = await fetch(`http://127.0.0.1:${PORT}${post.photoUrl}`);
+    assert.equal(photo.status, 200);
+    assert.equal(photo.headers.get('content-type'), 'image/png');
+
+    const liked = (await api('POST', `/posts/${post.id}/like`, { token: crew.b.token })).body.post;
+    assert.deepEqual([liked.likeCount, liked.likedByMe], [1, true]);
+    const unliked = (await api('POST', `/posts/${post.id}/like`, { token: crew.b.token })).body.post;
+    assert.deepEqual([unliked.likeCount, unliked.likedByMe], [0, false]);
+
+    const commented = await api('POST', `/posts/${post.id}/comments`, { token: crew.b.token, body: { text: 'Congrats' } });
+    assert.equal(commented.status, 201);
+    assert.equal(commented.body.post.commentCount, 1);
+    assert.equal((await api('GET', `/posts/${post.id}/comments`, { token: crew.a.token })).body.comments[0].text, 'Congrats');
+
+    assert.equal((await api('DELETE', `/posts/${post.id}`, { token: crew.b.token })).status, 403);
+    assert.equal((await api('DELETE', `/posts/${post.id}`, { token: crew.a.token })).status, 204);
+    assert.equal((await fetch(`http://127.0.0.1:${PORT}${post.photoUrl}`)).status, 404);
+  });
+
+  test('rejects empty posts and files that are not images', async () => {
+    const { token } = await newUser();
+    assert.equal((await api('POST', '/posts', { token, body: { text: '  ' } })).status, 400);
+    const bad = await api('POST', '/posts', { token, body: { text: 'hi', photo: 'data:text/html;base64,PGI+' } });
+    assert.equal(bad.status, 400);
+  });
+});
+
+describe('crew chat', () => {
+  test('only your crew sees its messages; polling returns just the new ones', async () => {
+    const crew = await newCrew('Chatty');
+    const other = await newCrew('Elsewhere');
+    const first = await api('POST', '/crews/mine/messages', { token: crew.a.token, body: { text: 'hello crew' } });
+    assert.equal(first.status, 201);
+    const since = first.body.message.createdAt;
+    await new Promise((r) => setTimeout(r, 5));
+    await api('POST', '/crews/mine/messages', { token: crew.b.token, body: { text: 'hey!' } });
+
+    const all = (await api('GET', '/crews/mine/messages', { token: crew.b.token })).body.messages;
+    assert.deepEqual(all.map((m) => m.text), ['hello crew', 'hey!']);
+    const fresh = (await api('GET', `/crews/mine/messages?after=${encodeURIComponent(since)}`, { token: crew.a.token })).body.messages;
+    assert.deepEqual(fresh.map((m) => m.text), ['hey!']);
+    assert.deepEqual((await api('GET', '/crews/mine/messages', { token: other.a.token })).body.messages, []);
+
+    const loner = await newUser();
+    assert.equal((await api('GET', '/crews/mine/messages', { token: loner.token })).status, 409);
+  });
+
+  test('a check-in posts a note in the crew chat', async () => {
+    const crew = await newCrew('Noted');
+    const event = await createEvent({ checkinCode: 'NOTE' });
+    assert.equal((await api('POST', `/events/${event.id}/checkin`, { token: crew.a.token, body: { code: 'note' } })).status, 200);
+    const { messages } = (await api('GET', '/crews/mine/messages', { token: crew.b.token })).body;
+    const note = messages.find((m) => m.kind === 'system');
+    assert.match(note.text, /checked the crew in at Test workshop · \+50/);
+    assert.equal(note.author, null);
+  });
+});

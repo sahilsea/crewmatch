@@ -93,6 +93,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (_skills.isEmpty) 'a skill',
       ];
 
+  int get _requiredCount => _single.length + 2;
+
+  /// Share of the required answers given, for the progress bar.
+  double get _progress => (_requiredCount - _missing.length) / _requiredCount;
+
   void _edit(VoidCallback change) => setState(() {
         change();
         _saved = false;
@@ -153,31 +158,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       body: SafeArea(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const TopMenuBar(trailing: LogOutButton()),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: RetroWindow(
-                  title: widget.firstTime ? 'Build your profile' : 'Your profile',
-                  onClose: widget.firstTime ? null : () => Navigator.of(context).pop(),
-                  inset: false,
-                  fill: true,
-                  footer: options == null ? null : _saveBar(),
-                  child: options == null
-                      ? (_loadError == null
-                          ? const LoadingView()
-                          : ErrorView(
-                              error: _loadError!,
-                              onRetry: () {
-                                setState(() => _loadError = null);
-                                _loadOptions();
-                              },
-                            ))
-                      : _form(user, options),
-                ),
-              ),
+            ScreenHeader(
+              title: widget.firstTime ? 'Build your profile' : 'Your profile',
+              leading: widget.firstTime
+                  ? null
+                  : IconButton(
+                      tooltip: 'Back',
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+                      icon: const Icon(Icons.arrow_back_rounded, color: Palette.ink),
+                    ),
+              trailing: widget.firstTime ? const LogOutButton() : null,
             ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: ThinProgressBar(value: _progress, color: Palette.crimson),
+            ),
+            Expanded(
+              child: options == null
+                  ? (_loadError == null
+                      ? const LoadingView()
+                      : ErrorView(
+                          error: _loadError!,
+                          onRetry: () {
+                            setState(() => _loadError = null);
+                            _loadOptions();
+                          },
+                        ))
+                  : _form(user, options),
+            ),
+            if (options != null) _saveBar(),
           ],
         ),
       ),
@@ -186,13 +198,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _form(User user, ProfileOptions options) => ListView(
         children: [
-          _Header(user: user, firstTime: widget.firstTime),
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 16, 14, 20),
+            padding: const EdgeInsets.fromLTRB(16, 22, 16, 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              spacing: 16,
+              spacing: 22,
               children: [
+                Rise(child: Text('What do you bring?', style: AppType.title(size: 24).copyWith(height: 1.08))),
                 LabeledField(
                   label: 'Name',
                   controller: _name,
@@ -205,7 +217,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   label: 'Bio (${280 - _bio.text.length} left)',
                   controller: _bio,
                   error: _errors['bio'],
-                  hint: 'One line about what you bring to a team.',
+                  hint: 'One line about you',
                   maxLength: 280,
                   maxLines: 3,
                   onChanged: (_) => _edit(() {}),
@@ -254,16 +266,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         : _saved
             ? '✓ Saved'
             : '✓ Looks good';
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
-      decoration: const BoxDecoration(
-        color: Palette.strip,
-        border: Border(top: Frame.side),
-      ),
-      child: Row(
-        spacing: 10,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 8,
         children: [
-          Expanded(child: Label(status, size: 18, color: Palette.ink, maxLines: 2)),
+          Text(status, textAlign: TextAlign.center, maxLines: 2, style: AppType.body(size: 13, color: Palette.muted)),
           FilledButton(
             onPressed: _busy || missing.isNotEmpty ? null : _save,
             child: Text(
@@ -278,44 +287,4 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-}
-
-class _Header extends StatelessWidget {
-  const _Header({required this.user, required this.firstTime});
-
-  final User user;
-  final bool firstTime;
-
-  @override
-  Widget build(BuildContext context) => DecoratedBox(
-        decoration: const BoxDecoration(border: Border(bottom: Frame.side)),
-        child: Halftone(
-          color: Palette.blue,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              spacing: 14,
-              children: [
-                Avatar(url: user.avatar, name: user.name, size: 76),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    spacing: 4,
-                    children: [
-                      Text(user.name, style: AppType.headline(size: 28)),
-                      Label(
-                        firstTime
-                            ? 'Tap what fits. Your matches are scored on it.'
-                            : 'Changes reach your deck on web and mobile',
-                        size: 18,
-                        color: Palette.ink,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
 }

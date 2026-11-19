@@ -53,3 +53,13 @@ String countdown(HubEvent e, DateTime now) => switch (e.state) {
       EventState.live => '${e.isChallenge ? 'Closes' : 'Ends'} in ${span(e.endsAt.difference(now))}',
       EventState.ended => e.isChallenge ? 'Closed' : 'Ended',
     };
+
+/// How long ago, compactly: "now", "12m", "3h", "2d", then "28 Oct".
+String timeAgo(DateTime t, DateTime now) {
+  final d = now.difference(t);
+  if (d.inMinutes < 1) return 'now';
+  if (d.inHours < 1) return '${d.inMinutes}m';
+  if (d.inDays < 1) return '${d.inHours}h';
+  if (d.inDays < 7) return '${d.inDays}d';
+  return '${t.day} ${_months[t.month - 1]}';
+}

@@ -4,36 +4,56 @@ import '../../models/user.dart';
 import '../../ui/ui.dart';
 import '../../util/labels.dart';
 
-/// One swipe card: halftone photo, fit %, name, why they fit, and the facts.
+/// One swipe card: photo with the fit tag, name, why they fit and
+/// superpowers.
 class ProfileCard extends StatelessWidget {
   const ProfileCard({super.key, required this.person, required this.position});
 
   final User person;
 
-  /// "1 of 18"
+  /// "1 of 18", shown under the card by the Discover screen.
   final String position;
 
   @override
   Widget build(BuildContext context) => Container(
-        decoration: const BoxDecoration(color: Palette.inset, border: Frame.border),
+        decoration: BoxDecoration(
+          color: Palette.window,
+          borderRadius: Frame.radius,
+          border: Frame.border,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: _Photo(person: person)),
+            _About(person: person),
+          ],
+        ),
+      );
+}
+
+class _Photo extends StatelessWidget {
+  const _Photo({required this.person});
+
+  final User person;
+
+  @override
+  Widget build(BuildContext context) => ColoredBox(
+        color: Palette.pink,
         child: LayoutBuilder(
           builder: (context, constraints) {
-            // The photo gives way first on short screens.
-            final photoHeight = (constraints.maxHeight * 0.34).clamp(110.0, 190.0);
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            final size = (constraints.maxHeight - 40).clamp(72.0, 128.0);
+            return Stack(
               children: [
-                SizedBox(height: photoHeight, child: _Photo(person: person, height: photoHeight)),
-                _FileStrip(name: profileFileName(person.name), position: position),
-                Expanded(
-                  // Long bios are clipped rather than overflowing the card.
-                  child: SingleChildScrollView(
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
-                    child: _About(person: person),
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(color: Palette.gold, shape: BoxShape.circle),
+                    child: Avatar(url: person.avatar, name: person.name, size: size),
                   ),
                 ),
-                _Facts(person: person),
+                if (person.score case final score?)
+                  Positioned(top: 14, left: 14, child: _FitTag(score)),
               ],
             );
           },
@@ -41,56 +61,26 @@ class ProfileCard extends StatelessWidget {
       );
 }
 
-class _Photo extends StatelessWidget {
-  const _Photo({required this.person, required this.height});
+class _FitTag extends StatelessWidget {
+  const _FitTag(this.score);
 
-  final User person;
-  final double height;
-
-  @override
-  Widget build(BuildContext context) => Halftone(
-        color: Palette.blue,
-        child: Stack(
-          children: [
-            Center(
-              child: Avatar(
-                url: person.avatar,
-                name: person.name,
-                size: (height - 40).clamp(72.0, 136.0),
-              ),
-            ),
-            if (person.score case final score?)
-              Positioned(top: 8, right: 8, child: FitBadge(score)),
-          ],
-        ),
-      );
-}
-
-class _FileStrip extends StatelessWidget {
-  const _FileStrip({required this.name, required this.position});
-
-  final String name;
-  final String position;
+  final int score;
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-        decoration: const BoxDecoration(
-          color: Palette.strip,
-          border: Border.symmetric(horizontal: Frame.side),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppType.label(size: 17, color: const Color(0xFF3D3935)),
-              ),
-            ),
-            Label(position, size: 17, color: const Color(0xFF3D3935)),
-          ],
+  Widget build(BuildContext context) => Pulse(
+        minScale: 0.96,
+        period: const Duration(milliseconds: 1400),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: const BoxDecoration(color: Palette.crimson, borderRadius: Frame.chipRadius),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            spacing: 6,
+            children: [
+              const Icon(Icons.bolt_rounded, size: 16, color: Palette.onCrimson),
+              Text('$score% fit', style: AppType.body(size: 14, weight: FontWeight.w700, color: Palette.onCrimson)),
+            ],
+          ),
         ),
       );
 }
@@ -101,63 +91,44 @@ class _About extends StatelessWidget {
   final User person;
 
   @override
-  Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        spacing: 6,
-        children: [
-          Text(person.name, style: AppType.headline(size: 28)),
-          Label(personMeta(person), size: 18, color: Palette.mutedDark),
-          if (person.bio.isNotEmpty) Text(person.bio, style: AppType.body()),
-          if (person.tags.isNotEmpty)
-            Wrap(
-              spacing: 5,
-              runSpacing: 5,
-              children: [for (final tag in person.tags) Tag(tag)],
-            ),
-        ],
-      );
-}
-
-class _Facts extends StatelessWidget {
-  const _Facts({required this.person});
-
-  final User person;
-
-  @override
-  Widget build(BuildContext context) {
-    final facts = [
-      ('Skills', person.skills.join(', ')),
-      if (person.superpowers.isNotEmpty)
-        ('Powers', person.superpowers.map(optionLabel).join(', ')),
-      ('Into', person.interests.map(optionLabel).join(', ')),
-    ];
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-      child: Column(
-        children: [
-          for (final (label, value) in facts) ...[
-            const DashedLine(),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 5),
-              child: Row(
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 10,
+          children: [
+            Rise(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: 2,
                 children: [
-                  SizedBox(width: 66, child: Label(label, color: Palette.mutedDark)),
-                  Expanded(
-                    child: Text(
-                      value.isEmpty ? '—' : value,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppType.body(size: 14, height: 1.3),
-                    ),
-                  ),
+                  Text(person.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.title(size: 24)),
+                  Text(personMeta(person), maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.body(size: 14, color: Palette.muted)),
                 ],
               ),
             ),
+            if (person.tags.isNotEmpty)
+              Rise(
+                delay: const Duration(milliseconds: 80),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [for (final tag in person.tags.take(2)) InfoTag(tag, icon: Icons.check_rounded)],
+                ),
+              ),
+            if (person.superpowers.isNotEmpty)
+              Rise(
+                delay: const Duration(milliseconds: 160),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final power in person.superpowers)
+                      InfoTag(optionLabel(power), color: Palette.navy, textColor: Palette.cream),
+                  ],
+                ),
+              ),
           ],
-          const DashedLine(),
-        ],
-      ),
-    );
-  }
+        ),
+      );
 }

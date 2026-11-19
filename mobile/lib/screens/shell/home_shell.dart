@@ -2,7 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../crew/crew_screen.dart';
 import '../discover/discover_screen.dart';
-import '../events/events_screen.dart';
+import '../posts/posts_screen.dart';
 import '../leaderboard/leaderboard_screen.dart';
 import '../matches/matches_screen.dart';
 import 'app_tab.dart';
@@ -21,13 +21,15 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
-  var _tab = AppTab.discover;
+  /// Remembered across theme switches, which rebuild the whole app.
+  static var _lastTab = AppTab.discover;
+  var _tab = _lastTab;
 
   /// Bumped on every dock tap, so tapping the open tab reloads it.
   var _visit = 0;
 
   void _open(AppTab tab) => setState(() {
-        _tab = tab;
+        _tab = _lastTab = tab;
         _visit++;
       });
 
@@ -45,7 +47,7 @@ class _HomeShellState extends State<HomeShell> {
                     AppTab.discover => DiscoverScreen(onOpen: _open),
                     AppTab.matches => MatchesScreen(onOpen: _open),
                     AppTab.crew => CrewScreen(onOpen: _open),
-                    AppTab.events => EventsScreen(onOpen: _open),
+                    AppTab.posts => PostsScreen(onOpen: _open),
                     AppTab.ranks => LeaderboardScreen(onOpen: _open),
                   },
                 ),

@@ -98,7 +98,7 @@ class ErrorNote extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           decoration: BoxDecoration(
-            color: const Color(0xFFFCE4E6),
+            color: const Tone(0xFFFCE4E6, Color(0xFF3A1A1A)),
             border: Border.all(color: Palette.danger, width: Frame.line),
           ),
           child: Text(message, style: AppType.body(size: 14.5, color: Palette.danger)),

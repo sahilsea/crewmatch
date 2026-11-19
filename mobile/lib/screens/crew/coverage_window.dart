@@ -4,7 +4,8 @@ import '../../models/crew.dart';
 import '../../ui/ui.dart';
 import '../../util/labels.dart';
 
-/// Which must-haves the crew covers: frontend, backend, design, pitching.
+/// Which must-haves the crew still lacks (frontend, backend, design,
+/// pitching), on a navy card. Gold when every role is covered.
 class CoverageWindow extends StatelessWidget {
   const CoverageWindow({super.key, required this.crew});
 
@@ -13,44 +14,32 @@ class CoverageWindow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final missing = crew.missing.map((key) => checklistLabels[key] ?? key).toList();
-    return RetroWindow(
-      title: 'Coverage',
-      inset: false,
-      status: missing.isEmpty ? 'All four covered' : '${missing.length} of 4 missing',
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+    final covered = missing.isEmpty;
+    final fg = covered ? Palette.onGold : Palette.cream;
+    return Rise(
+      delay: const Duration(milliseconds: 300),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: BoxDecoration(color: covered ? Palette.gold : Palette.navy, borderRadius: Frame.radius),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 10,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 6,
           children: [
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 10,
-              childAspectRatio: 5,
+            Row(
+              spacing: 8,
               children: [
-                for (final MapEntry(:key, :value) in checklistLabels.entries)
-                  Semantics(
-                    label: '$value ${crew.checklist[key] == true ? 'covered' : 'missing'}',
-                    excludeSemantics: true,
-                    child: Row(
-                      spacing: 8,
-                      children: [
-                        TickBox(checked: crew.checklist[key] == true),
-                        Text(value, style: AppType.body()),
-                      ],
-                    ),
+                Pulse(
+                  minScale: 0.85,
+                  child: Icon(covered ? Icons.check_circle_rounded : Icons.bolt_rounded, size: 20, color: covered ? Palette.onGold : Palette.gold),
+                ),
+                Expanded(
+                  child: Text(
+                    covered ? 'Every role covered' : 'Missing: ${missing.join(', ')}',
+                    style: AppType.body(size: 16, weight: FontWeight.w500, color: fg),
                   ),
+                ),
               ],
             ),
-            if (missing.isNotEmpty && crew.spotsLeft > 0)
-              Text(
-                'Still missing ${missing.join(' and ')}. '
-                'Your deck now ranks people who fill that gap first.',
-                style: AppType.body(size: 14, color: Palette.mutedDark),
-              ),
           ],
         ),
       ),

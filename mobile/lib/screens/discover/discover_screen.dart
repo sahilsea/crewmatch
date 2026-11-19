@@ -23,7 +23,6 @@ class DiscoverScreen extends StatefulWidget {
 class _DiscoverScreenState extends State<DiscoverScreen> {
   final _stack = GlobalKey<SwipeStackState>();
   List<User>? _cards;
-  var _crewMode = false;
   var _seen = 0;
   var _total = 0;
   Object? _error;
@@ -40,7 +39,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       if (!mounted) return;
       setState(() {
         _cards = [...deck.cards];
-        _crewMode = deck.scoredAgainstCrew;
         _seen = 0;
         _total = deck.cards.length;
         _error = null;
@@ -83,7 +81,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   @override
   Widget build(BuildContext context) {
     final cards = _cards;
-    final hasCards = cards != null && cards.isNotEmpty;
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
@@ -93,52 +90,73 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       },
       child: Focus(
         autofocus: true,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: RetroWindow(
-            title: 'Discover',
-            inset: false,
-            fill: true,
-            footer: hasCards
-                ? SegmentRow(
-                    segments: [
-                      Segment(
-                        label: 'Pass',
-                        glyph: Glyph.cross,
-                        color: Palette.window,
-                        onPressed: () => _stack.currentState?.swipe(SwipeDirection.left),
-                      ),
-                      Segment(
-                        label: 'Like',
-                        glyph: Glyph.heart,
-                        color: Palette.pink,
-                        onPressed: () => _stack.currentState?.swipe(SwipeDirection.right),
-                      ),
-                    ],
-                  )
-                : null,
-            status: hasCards
-                ? (_crewMode ? 'Ranked for your crew · best fits first' : 'Best fits first · drag or tap')
-                : null,
-            child: switch (cards) {
-              null when _error != null => ErrorView(error: _error!, onRetry: _retry),
-              null => const LoadingView(message: 'Ranking your best fits…'),
-              [] => _EmptyDeck(
-                  onShowPassed: _showPassedAgain,
-                  onSeeMatches: () => widget.onOpen(AppTab.matches),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ScreenHeader(
+              title: 'Discover',
+              trailing: IconButton(
+                tooltip: 'How ranking works',
+                onPressed: () => showNotice(
+                  context,
+                  'Ranked on complementary skills (50%), work style (30%) and shared interests (20%).',
                 ),
-              final List<User> deck => Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: SwipeStack(
-                    key: _stack,
-                    cards: deck,
-                    seen: _seen,
-                    total: _total,
-                    onSwiped: _onSwiped,
-                  ),
-                ),
-            },
-          ),
+                style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+                icon: const Icon(Icons.tune_rounded, color: Palette.muted),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+                child: switch (cards) {
+                  null when _error != null => ErrorView(error: _error!, onRetry: _retry),
+                  null => const LoadingView(message: 'Ranking your best fits…'),
+                  [] => _EmptyDeck(
+                      onShowPassed: _showPassedAgain,
+                      onSeeMatches: () => widget.onOpen(AppTab.matches),
+                    ),
+                  final List<User> deck => Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      spacing: 14,
+                      children: [
+                        Expanded(
+                          child: SwipeStack(
+                            key: _stack,
+                            cards: deck,
+                            seen: _seen,
+                            total: _total,
+                            onSwiped: _onSwiped,
+                          ),
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          spacing: 28,
+                          children: [
+                            _ActionButton(
+                              label: 'Pass',
+                              size: 64,
+                              onPressed: () => _stack.currentState?.swipe(SwipeDirection.left),
+                              child: const Icon(Icons.close_rounded, size: 28, color: Palette.muted),
+                            ),
+                            Pulse(
+                              minScale: 0.94,
+                              period: const Duration(milliseconds: 1200),
+                              child: _ActionButton(
+                                label: 'Like',
+                                size: 72,
+                                primary: true,
+                                onPressed: () => _stack.currentState?.swipe(SwipeDirection.right),
+                                child: const Icon(Icons.favorite_rounded, size: 32, color: Palette.onCrimson),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -148,6 +166,40 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     setState(() => _error = null);
     _load();
   }
+}
+
+/// The round Pass and Like buttons under the card.
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.label,
+    required this.size,
+    required this.onPressed,
+    required this.child,
+    this.primary = false,
+  });
+
+  final String label;
+  final double size;
+  final VoidCallback onPressed;
+  final Widget child;
+  final bool primary;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        button: true,
+        label: label,
+        child: Material(
+          color: primary ? Palette.crimson : Palette.desktop,
+          shape: CircleBorder(
+            side: primary ? BorderSide.none : const BorderSide(color: Palette.dashed, width: 1.5),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onPressed,
+            child: SizedBox.square(dimension: size, child: Center(child: child)),
+          ),
+        ),
+      );
 }
 
 class _EmptyDeck extends StatelessWidget {
@@ -160,9 +212,8 @@ class _EmptyDeck extends StatelessWidget {
   Widget build(BuildContext context) => Center(
         child: SingleChildScrollView(
           child: EmptyState(
-            title: "You've seen everyone for now",
-            message: 'New students join all the time. Check back soon, '
-                'or give the people you passed another look.',
+            title: "You've seen everyone",
+            message: 'Check back soon.',
             actions: [
               FilledButton(onPressed: onShowPassed, child: const Text('Show passed people')),
               OutlinedButton(onPressed: onSeeMatches, child: const Text('See matches')),

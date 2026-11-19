@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import 'glyphs.dart';
+import 'motion.dart';
 import 'palette.dart';
 import 'type.dart';
 
@@ -13,15 +14,50 @@ class Tag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-        decoration: BoxDecoration(color: color, border: Frame.border),
-        child: Text(text, style: AppType.body(size: 13.5, height: 1.3)),
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: color == Palette.desktop ? Palette.gold : color,
+      borderRadius: Frame.tagRadius,
+    ),
+    child: Text(
+      text,
+      style: AppType.body(
+        size: 13,
+        weight: FontWeight.w500,
+        height: 1.3,
+        color: color == Palette.desktop ? Palette.onGold : Palette.ink,
+      ),
+    ),
+  );
+}
+
+/// A crimson pill with a count, next to a screen title.
+class CountBadge extends StatelessWidget {
+  const CountBadge(this.count, {super.key});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) => PopIn(
+        child: Container(
+          constraints: const BoxConstraints(minWidth: 24),
+          height: 24,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(color: Palette.crimson, borderRadius: Frame.pill),
+          child: Text('$count', style: AppType.body(size: 13, weight: FontWeight.w700, height: 1, color: Palette.onCrimson)),
+        ),
       );
 }
 
-/// Black-on-cream marker: "YOU", "FULL", "LIVE".
+/// Small marker: "YOU", "FULL", "LIVE".
 class InkBadge extends StatelessWidget {
-  const InkBadge(this.text, {super.key, this.inverted = false, this.round = false});
+  const InkBadge(
+    this.text, {
+    super.key,
+    this.inverted = false,
+    this.round = false,
+  });
 
   final String text;
 
@@ -33,26 +69,56 @@ class InkBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: EdgeInsets.symmetric(horizontal: round ? 7 : 5),
-        decoration: BoxDecoration(
-          color: inverted ? Palette.cream : Palette.ink,
-          borderRadius: BorderRadius.circular(round ? 9 : 0),
-        ),
-        child: Label(text, size: 15, color: inverted ? Palette.ink : Palette.cream),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+    decoration: BoxDecoration(
+      color: inverted
+          ? Palette.cream
+          : (round ? Palette.crimson : Palette.navy),
+      borderRadius: Frame.tagRadius,
+    ),
+    child: Label(text, size: 15, color: inverted ? Palette.ink : Palette.cream),
+  );
 }
 
-/// The small black "LIVE" pill.
+/// The crimson "LIVE" tag, with a gently pulsing dot.
 class LivePill extends StatelessWidget {
   const LivePill({super.key, this.inverted = false});
 
   final bool inverted;
 
   @override
-  Widget build(BuildContext context) => InkBadge('Live', inverted: inverted, round: true);
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+    decoration: BoxDecoration(
+      color: inverted ? Palette.cream : Palette.crimson,
+      borderRadius: Frame.tagRadius,
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Pulse(
+          child: SizedBox.square(
+            dimension: 6,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Palette.gold,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 5),
+        Label(
+          'Live',
+          size: 15,
+          color: inverted ? Palette.ink : Palette.onCrimson,
+        ),
+      ],
+    ),
+  );
 }
 
-/// "92% FIT" in a cream box with an ink border.
+/// "92% fit" on a crimson tag.
 class FitBadge extends StatelessWidget {
   const FitBadge(this.score, {super.key, this.size = 20});
 
@@ -61,15 +127,29 @@ class FitBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
-        decoration: const BoxDecoration(color: Palette.window, border: Frame.border),
-        child: Label('$score% fit', size: size, color: Palette.ink),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+    decoration: const BoxDecoration(
+      color: Palette.crimson,
+      borderRadius: Frame.chipRadius,
+    ),
+    child: Text(
+      '$score% fit',
+      style: AppType.body(
+        size: size * 0.7,
+        weight: FontWeight.w700,
+        color: Palette.onCrimson,
+      ),
+    ),
+  );
 }
 
-/// A thin bar with an ink fill, for capacity and progress.
+/// A thin rounded bar that fills in when it appears, for capacity and progress.
 class ThinProgressBar extends StatelessWidget {
-  const ThinProgressBar({super.key, required this.value, this.color = Palette.ink});
+  const ThinProgressBar({
+    super.key,
+    required this.value,
+    this.color = Palette.crimson,
+  });
 
   /// 0 to 1.
   final double value;
@@ -77,21 +157,32 @@ class ThinProgressBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        height: 8,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF6F3EE),
-          border: Border.all(color: Palette.ink),
+    height: 6,
+    decoration: const BoxDecoration(
+      color: Palette.strip,
+      borderRadius: BorderRadius.all(Radius.circular(3)),
+    ),
+    clipBehavior: Clip.antiAlias,
+    alignment: Alignment.centerLeft,
+    child: TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: value.clamp(0.0, 1.0)),
+      duration: Motion.of(context, const Duration(milliseconds: 800)),
+      curve: Motion.ease,
+      builder: (context, v, _) => FractionallySizedBox(
+        widthFactor: v,
+        heightFactor: 1,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: const BorderRadius.all(Radius.circular(3)),
+          ),
         ),
-        alignment: Alignment.centerLeft,
-        child: FractionallySizedBox(
-          widthFactor: value.clamp(0.0, 1.0),
-          heightFactor: 1,
-          child: ColoredBox(color: color),
-        ),
-      );
+      ),
+    ),
+  );
 }
 
-/// A square tick box: blue with a tick when covered, pink with a cross when not.
+/// A small tick box: gold with a tick when covered, light with a cross when not.
 class TickBox extends StatelessWidget {
   const TickBox({super.key, required this.checked, this.size = 22});
 
@@ -100,13 +191,14 @@ class TickBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: size,
-        height: size,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: checked ? Palette.blue : Palette.pink,
-          border: Frame.border,
-        ),
-        child: GlyphIcon(checked ? Glyph.check : Glyph.cross, size: size * 0.5),
-      );
+    width: size,
+    height: size,
+    alignment: Alignment.center,
+    decoration: BoxDecoration(
+      color: checked ? Palette.gold : Palette.field,
+      border: checked ? null : Border.all(color: Palette.dashed),
+      borderRadius: Frame.tagRadius,
+    ),
+    child: GlyphIcon(checked ? Glyph.check : Glyph.cross, size: size * 0.5),
+  );
 }

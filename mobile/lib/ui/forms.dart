@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'motion.dart';
 import 'palette.dart';
 import 'type.dart';
 
@@ -94,32 +95,10 @@ class Fieldset extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 10,
         children: [
-          Stack(
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 10),
-                padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: error == null ? Palette.ink : Palette.danger,
-                    width: Frame.line,
-                  ),
-                  borderRadius: const BorderRadius.all(Radius.circular(4)),
-                ),
-                child: child,
-              ),
-              Positioned(
-                left: 8,
-                top: 0,
-                child: Container(
-                  color: Palette.window,
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Label(legend, size: 20, color: Palette.ink),
-                ),
-              ),
-            ],
-          ),
+          Text(legend, style: AppType.body(size: 16, weight: FontWeight.w500, color: error == null ? Palette.ink : Palette.danger)),
+          child,
           if (error != null)
             Padding(
               padding: const EdgeInsets.only(top: 4),
@@ -129,14 +108,14 @@ class Fieldset extends StatelessWidget {
       );
 }
 
-/// A tappable option chip: ink with cream text when selected.
+/// A tappable option chip: gold with a check when selected.
 class OptionChip extends StatelessWidget {
   const OptionChip({
     super.key,
     required this.label,
     required this.selected,
     required this.onTap,
-    this.color = Palette.ink,
+    this.color = Palette.gold,
   });
 
   final String label;
@@ -151,31 +130,35 @@ class OptionChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = onTap != null || selected;
-    final dark = selected && color == Palette.ink;
     return Semantics(
       container: true,
       button: true,
       selected: selected,
       enabled: onTap != null,
       child: Material(
-        color: selected ? color : Palette.field,
+        color: selected ? color : Colors.transparent,
         shape: RoundedRectangleBorder(
-          side: BorderSide(color: enabled ? Palette.ink : Palette.border, width: Frame.line),
-          borderRadius: const BorderRadius.all(Radius.circular(4)),
+          side: BorderSide(color: selected ? color : (enabled ? Palette.dashed : Palette.border)),
+          borderRadius: Frame.chipRadius,
         ),
+        clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          child: Container(
+          child: AnimatedContainer(
+            duration: Motion.of(context, const Duration(milliseconds: 180)),
             constraints: const BoxConstraints(minHeight: 44),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Row(
               mainAxisSize: MainAxisSize.min,
+              spacing: 6,
               children: [
+                if (selected) PopIn(child: Icon(Icons.check_rounded, size: 16, color: color == Palette.gold ? Palette.onGold : Palette.cream)),
                 Text(
                   label,
                   style: AppType.body(
+                    size: 14,
                     weight: FontWeight.w500,
-                    color: dark ? Palette.cream : (enabled ? Palette.ink : Palette.muted),
+                    color: selected ? (color == Palette.gold ? Palette.onGold : Palette.cream) : (enabled ? Palette.ink : Palette.muted),
                   ),
                 ),
               ],

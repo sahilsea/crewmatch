@@ -5,7 +5,6 @@ import '../../models/crew.dart';
 import '../../models/user.dart';
 import '../../state/session.dart';
 import '../../ui/ui.dart';
-import '../../util/labels.dart';
 import '../../util/parallel.dart';
 import '../shell/app_tab.dart';
 import 'match_tile.dart';
@@ -71,7 +70,8 @@ class _MatchesScreenState extends State<MatchesScreen> {
       setState(() {
         _crew = crew;
         _matches = [
-          for (final m in _matches!) m.id == person.id ? m.copyWith(inCrew: true) : m,
+          for (final m in _matches!)
+            m.id == person.id ? m.copyWith(inCrew: true) : m,
         ];
       });
       showNotice(context, 'Added ${person.name} to ${crew.name}');
@@ -80,57 +80,95 @@ class _MatchesScreenState extends State<MatchesScreen> {
     }
   }
 
+  Future<void> _removeFromCrew(User person) async {
+    final crew = _crew;
+    if (crew == null) return;
+    if (crew.members.length <= 2) {
+      return showNotice(context, 'A crew needs two people. Leave it from the Crew tab instead.');
+    }
+    final confirmed = await confirmAction(
+      context,
+      title: 'Remove from crew',
+      message: 'Take ${person.name} out of ${crew.name}?',
+      confirmLabel: 'Remove',
+    );
+    if (!confirmed || !mounted) return;
+    try {
+      final updated = await context.api.removeCrewMember(person.id);
+      if (!mounted) return;
+      setState(() {
+        _crew = updated;
+        _matches = [
+          for (final m in _matches!)
+            m.id == person.id ? m.copyWith(inCrew: false) : m,
+        ];
+      });
+    } on ApiException catch (e) {
+      if (mounted) showNotice(context, e.message);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final matches = _matches;
-    return Padding(
-      padding: const EdgeInsets.all(14),
-      child: RetroWindow(
-        title: 'Matches',
-        fill: true,
-        status: matches == null || matches.isEmpty
-            ? null
-            : '${plural(matches.length, 'match', 'matches')} · newest first',
-        child: switch (matches) {
-          null when _error != null => ErrorView(error: _error!, onRetry: _retry),
-          null => const LoadingView(),
-          [] => Center(
-              child: SingleChildScrollView(
-                child: EmptyState(
-                  title: 'No matches yet',
-                  message: "Swipe right on people you'd team up with. "
-                      'When they like you back, they show up here.',
-                  actions: [
-                    FilledButton(
-                      onPressed: () => widget.onOpen(AppTab.discover),
-                      child: const Text('Start swiping'),
-                    ),
-                  ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ScreenHeader(
+          title: 'Matches',
+          trailing: matches == null || matches.isEmpty ? null : Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: CountBadge(matches.length),
+          ),
+        ),
+        Expanded(
+          child: switch (matches) {
+            null when _error != null => ErrorView(error: _error!, onRetry: _retry),
+            null => const LoadingView(),
+            [] => Center(
+                child: SingleChildScrollView(
+                  child: EmptyState(
+                    title: 'No matches yet',
+                    message: 'Likes that go both ways land here.',
+                    actions: [
+                      FilledButton(
+                        onPressed: () => widget.onOpen(AppTab.discover),
+                        child: const Text('Start swiping'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          final List<User> list => RefreshIndicator(
-              onRefresh: _load,
-              child: ListView.separated(
-                physics: const AlwaysScrollableScrollPhysics(),
-                itemCount: list.length + (_crew == null ? 1 : 0),
-                separatorBuilder: (_, _) => const Divider(),
-                itemBuilder: (context, i) {
-                  if (_crew == null && i == 0) {
-                    return _StartCrewBanner(onTap: () => widget.onOpen(AppTab.crew));
-                  }
-                  final person = list[_crew == null ? i - 1 : i];
-                  return MatchTile(
-                    person: person,
-                    crew: _crew,
-                    onAddToCrew: () => _addToCrew(person),
-                    onUnmatch: () => _unmatch(person),
-                  );
-                },
+            final List<User> list => RefreshIndicator(
+                onRefresh: _load,
+                child: ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 16),
+                  itemCount: list.length,
+                  itemBuilder: (context, i) {
+                    final person = list[i];
+                    return SlideIn(
+                      key: ValueKey(person.id),
+                      delay: Motion.stagger(i, stepMs: 70),
+                      child: MatchTile(
+                        person: person,
+                        crew: _crew,
+                        onAddToCrew: switch (_crew) {
+                          null => () => widget.onOpen(AppTab.crew),
+                          final crew when crew.spotsLeft == 0 => () =>
+                              showNotice(context, 'Your crew is full. Tap “Added” on someone to make room.'),
+                          _ => () => _addToCrew(person),
+                        },
+                        onRemoveFromCrew: () => _removeFromCrew(person),
+                        onUnmatch: () => _unmatch(person),
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
-        },
-      ),
+          },
+        ),
+      ],
     );
   }
 
@@ -138,24 +176,4 @@ class _MatchesScreenState extends State<MatchesScreen> {
     setState(() => _error = null);
     _load();
   }
-}
-
-class _StartCrewBanner extends StatelessWidget {
-  const _StartCrewBanner({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        color: Palette.strip,
-        padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
-        child: Row(
-          children: [
-            const Expanded(
-              child: Label('No crew yet · start one from your matches', color: Palette.ink, maxLines: 2),
-            ),
-            TextButton(onPressed: onTap, child: const Text('Start a crew')),
-          ],
-        ),
-      );
 }

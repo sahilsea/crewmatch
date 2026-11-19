@@ -4,8 +4,8 @@ import 'glyphs.dart';
 import 'palette.dart';
 import 'type.dart';
 
-/// A retro desktop window: title bar with a close mark, content, and an
-/// optional footer and grey status strip.
+/// A card: a Cinzel title (with a close button when [onClose] is set),
+/// content, and an optional footer and status line.
 ///
 /// With [fill] the content stretches to the window's height (the window must
 /// get a bounded height, e.g. inside [Expanded]); without it the window sizes
@@ -25,10 +25,10 @@ class RetroWindow extends StatelessWidget {
   final String title;
   final Widget child;
 
-  /// Makes the ✕ a real button (dialogs, pushed screens). Without it the ✕ is decoration.
+  /// Shows a close button (dialogs, pushed screens).
   final VoidCallback? onClose;
 
-  /// Wraps [child] in the white inset panel with a 10px margin.
+  /// Wraps [child] in a little padding.
   final bool inset;
   final bool fill;
 
@@ -45,14 +45,10 @@ class RetroWindow extends StatelessWidget {
       decoration: const BoxDecoration(
         color: Palette.window,
         borderRadius: Frame.radius,
+        border: Frame.border,
         boxShadow: Frame.windowShadow,
       ),
-      foregroundDecoration: const BoxDecoration(
-        border: Frame.border,
-        borderRadius: Frame.radius,
-      ),
       clipBehavior: Clip.antiAlias,
-      padding: const EdgeInsets.all(Frame.line),
       child: Column(
         mainAxisSize: fill ? MainAxisSize.max : MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -74,56 +70,49 @@ class _TitleBar extends StatelessWidget {
   final VoidCallback? onClose;
 
   @override
-  Widget build(BuildContext context) {
-    const mark = GlyphIcon(Glyph.close, size: 12);
-    return Container(
-      height: 34,
-      padding: const EdgeInsets.only(right: 12),
-      decoration: const BoxDecoration(border: Border(bottom: Frame.side)),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 44,
-            child: onClose == null
-                ? const Center(child: mark)
-                : Semantics(
-                    button: true,
-                    label: 'Close',
-                    child: InkWell(onTap: onClose, child: const Center(child: mark)),
-                  ),
-          ),
-          Expanded(
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.fromLTRB(16, 12, onClose == null ? 16 : 4, 4),
+    child: Row(
+      children: [
+        Expanded(
+          child: Semantics(
+            header: true,
             child: Text(
-              title.toUpperCase(),
-              textAlign: TextAlign.right,
+              title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: AppType.title(),
+              style: AppType.title(size: 18),
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+        if (onClose != null)
+          IconButton(
+            onPressed: onClose,
+            tooltip: 'Close',
+            icon: const GlyphIcon(Glyph.close, size: 14, color: Palette.muted),
+          ),
+      ],
+    ),
+  );
 }
 
-/// The white, ink-bordered panel that holds a window's content.
+/// The content area of a card. Cards no longer box their content twice, so
+/// this only adds breathing room.
 class InsetPanel extends StatelessWidget {
-  const InsetPanel({super.key, required this.child, this.margin = const EdgeInsets.all(10)});
+  const InsetPanel({
+    super.key,
+    required this.child,
+    this.margin = const EdgeInsets.fromLTRB(4, 0, 4, 4),
+  });
 
   final Widget child;
   final EdgeInsets margin;
 
   @override
-  Widget build(BuildContext context) => Container(
-        margin: margin,
-        decoration: const BoxDecoration(color: Palette.inset, border: Frame.border),
-        clipBehavior: Clip.hardEdge,
-        child: child,
-      );
+  Widget build(BuildContext context) => Padding(padding: margin, child: child);
 }
 
-/// The grey strip along the bottom of a window: "3 reasons · weights are fixed".
+/// The quiet line along the bottom of a card: "3 reasons · weights are fixed".
 class StatusStrip extends StatelessWidget {
   const StatusStrip(this.text, {super.key});
 
@@ -131,11 +120,64 @@ class StatusStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-        decoration: const BoxDecoration(
-          color: Palette.strip,
-          border: Border(top: Frame.side),
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    decoration: const BoxDecoration(border: Border(top: Frame.side)),
+    child: Label(text, size: 16, color: Palette.mutedDark, maxLines: 1),
+  );
+}
+
+/// The top of a screen: a Cinzel title, an optional subtitle, and an optional
+/// action on the right.
+class ScreenHeader extends StatelessWidget {
+  const ScreenHeader({super.key, required this.title, this.subtitle, this.trailing, this.leading});
+
+  final String title;
+  final String? subtitle;
+  final Widget? trailing;
+  final Widget? leading;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: EdgeInsets.fromLTRB(leading == null ? 20 : 4, 20, 8, 8),
+        child: Row(
+          children: [
+            ?leading,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: 2,
+                children: [
+                  Semantics(header: true, child: Text(title, style: AppType.title(size: 24))),
+                  if (subtitle case final subtitle?) Text(subtitle, style: AppType.body(size: 14, color: Palette.muted)),
+                ],
+              ),
+            ),
+            ?trailing,
+          ],
         ),
-        child: Label(text, size: 16, color: Palette.mutedDark, maxLines: 1),
+      );
+}
+
+/// A small tag with an optional icon: gold reasons, navy superpowers.
+class InfoTag extends StatelessWidget {
+  const InfoTag(this.text, {super.key, this.icon, this.color = Palette.gold, this.textColor = Palette.onGold});
+
+  final String text;
+  final IconData? icon;
+  final Color color;
+  final Color textColor;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(color: color, borderRadius: Frame.tagRadius),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          spacing: 4,
+          children: [
+            if (icon != null) Icon(icon, size: 14, color: textColor),
+            Flexible(child: Text(text, style: AppType.body(size: 13, weight: FontWeight.w500, height: 1.2, color: textColor))),
+          ],
+        ),
       );
 }

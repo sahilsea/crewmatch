@@ -29,6 +29,9 @@ class ApiClient {
   /// deleted account), so the app can send the user back to sign in.
   void Function()? onUnauthorized;
 
+  /// A server path such as `/api/photos/…` as a full URL on the API's host.
+  String resolve(String path) => path.startsWith('http') ? path : Uri.parse(baseUrl).resolve(path).toString();
+
   Future<Map<String, dynamic>> get(String path) => send('GET', path);
 
   Future<Map<String, dynamic>> post(String path, [Map<String, Object?>? body]) =>

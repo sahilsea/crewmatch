@@ -1,90 +1,187 @@
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../models/user.dart';
 import '../../ui/ui.dart';
 
-/// "It's a match!" Resolves to true when the user wants to see their matches.
+/// "It's a match!" as a full screen. Resolves to true when the user wants to
+/// go to their matches (where they add people to the crew).
 Future<bool> showMatchDialog(BuildContext context, {required User me, required User them}) async {
-  final seeMatches = await showWindowDialog<bool>(
-    context,
-    title: 'New match',
-    builder: (context) => _MatchBody(me: me, them: them),
+  final seeMatches = await Navigator.of(context).push<bool>(
+    PageRouteBuilder(
+      fullscreenDialog: true,
+      transitionDuration: Motion.of(context, const Duration(milliseconds: 300)),
+      pageBuilder: (context, _, _) => _MatchScreen(me: me, them: them),
+      transitionsBuilder: (context, animation, _, child) => FadeTransition(opacity: animation, child: child),
+    ),
   );
   return seeMatches ?? false;
 }
 
-class _MatchBody extends StatelessWidget {
-  const _MatchBody({required this.me, required this.them});
+class _MatchScreen extends StatelessWidget {
+  const _MatchScreen({required this.me, required this.them});
 
   final User me;
   final User them;
 
   @override
   Widget build(BuildContext context) {
+    final first = them.name.split(' ').first;
     final email = them.email;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        DecoratedBox(
-          decoration: const BoxDecoration(border: Border(bottom: Frame.side)),
-          child: Halftone(
-            color: Palette.pink,
-            opacity: 0.16,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 18),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                spacing: 8,
-                children: [
-                  Avatar(url: me.avatar, name: me.name, size: 92),
-                  const GlyphIcon(Glyph.heart, size: 34, fill: Palette.cream),
-                  Avatar(url: them.avatar, name: them.name, size: 92, background: Palette.blue),
-                ],
+    return Scaffold(
+      backgroundColor: Palette.desktop,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Align(
+              alignment: Alignment.centerRight,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(0, 8, 8, 0),
+                child: IconButton(
+                  tooltip: 'Close',
+                  onPressed: () => Navigator.of(context).pop(false),
+                  style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+                  icon: const Icon(Icons.close_rounded, color: Palette.muted),
+                ),
               ),
             ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
-          child: Column(
-            spacing: 8,
-            children: [
-              Text("It's a match!", textAlign: TextAlign.center, style: AppType.headline(size: 38)),
-              Text.rich(
-                TextSpan(
-                  children: [
-                    const TextSpan(text: 'You and '),
-                    TextSpan(
-                      text: them.name,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const TextSpan(text: ' both swiped right.'),
-                  ],
+            Expanded(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+                  child: Column(
+                    spacing: 22,
+                    children: [
+                      _Pair(me: me, them: them),
+                      Rise(
+                        delay: const Duration(milliseconds: 550),
+                        child: Column(
+                          spacing: 8,
+                          children: [
+                            Text("It's a match!", textAlign: TextAlign.center, style: AppType.title(size: 30)),
+                            Text(
+                              'You both want to team up.',
+                              textAlign: TextAlign.center,
+                              style: AppType.body(size: 16, height: 1.5, color: Palette.muted),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Rise(
+                        delay: const Duration(milliseconds: 850),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          spacing: 8,
+                          children: [
+                            FilledButton(
+                              onPressed: () => Navigator.of(context).pop(true),
+                              child: const Text('Add to crew'),
+                            ),
+                            if (email != null)
+                              OutlinedButton(
+                                style: OutlinedButton.styleFrom(minimumSize: const Size(64, 52)),
+                                onPressed: () {
+                                  Clipboard.setData(ClipboardData(text: email));
+                                  showNotice(context, "$first's email is copied. Say hi!");
+                                },
+                                child: const Text('Say hi'),
+                              ),
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(false),
+                              child: const Text('Keep swiping'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                textAlign: TextAlign.center,
-                style: AppType.body(size: 16),
               ),
-              if (email != null)
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [const Label('Say hi:', size: 19), CopyText(email)],
-                ),
-            ],
-          ),
-        ),
-        SegmentRow(
-          segments: [
-            Segment(label: 'See matches', onPressed: () => Navigator.of(context).pop(true)),
-            Segment(
-              label: 'Keep swiping',
-              color: Palette.pink,
-              onPressed: () => Navigator.of(context).pop(false),
             ),
           ],
         ),
-      ],
+      ),
     );
   }
+}
+
+/// Both avatars slide in from the sides, the crimson heart pops in under
+/// them, and a few sparkles twinkle around.
+class _Pair extends StatelessWidget {
+  const _Pair({required this.me, required this.them});
+
+  final User me;
+  final User them;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget face(User user, Color background) => Container(
+          padding: const EdgeInsets.all(4),
+          decoration: const BoxDecoration(color: Palette.desktop, shape: BoxShape.circle),
+          child: Avatar(url: user.avatar, name: user.name, size: 108, background: background),
+        );
+    Widget spark(double size, Color color, {Duration delay = Duration.zero}) => PopIn(
+          delay: delay,
+          child: Pulse(minScale: 0.4, period: const Duration(milliseconds: 1100), child: Icon(Icons.auto_awesome, size: size, color: color)),
+        );
+    return SizedBox(
+      width: 300,
+      height: 190,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned(top: 6, left: 30, child: spark(18, Palette.gold)),
+          Positioned(top: 30, right: 22, child: spark(12, Palette.crimson, delay: const Duration(milliseconds: 400))),
+          Positioned(bottom: 16, left: 8, child: spark(14, Palette.gold, delay: const Duration(milliseconds: 800))),
+          Positioned(bottom: 4, right: 40, child: spark(20, Palette.gold, delay: const Duration(milliseconds: 1200))),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _SlideIn(fromLeft: true, child: face(me, Palette.gold)),
+              Transform.translate(offset: const Offset(-36, 0), child: _SlideIn(fromLeft: false, child: face(them, Palette.pink))),
+            ],
+          ),
+          Positioned(
+            bottom: 14,
+            child: PopIn(
+              delay: const Duration(milliseconds: 350),
+              child: Pulse(
+                minScale: 0.9,
+                period: const Duration(milliseconds: 800),
+                child: Container(
+                  width: 52,
+                  height: 52,
+                  decoration: const BoxDecoration(color: Palette.crimson, shape: BoxShape.circle),
+                  child: const Icon(Icons.favorite_rounded, size: 28, color: Palette.onCrimson),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SlideIn extends StatelessWidget {
+  const _SlideIn({required this.fromLeft, required this.child});
+
+  final bool fromLeft;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: Motion.of(context, const Duration(milliseconds: 600)),
+        curve: Motion.ease,
+        child: child,
+        builder: (context, t, child) => Opacity(
+          opacity: t,
+          child: Transform.translate(
+            offset: Offset((fromLeft ? -60 : 60) * (1 - t), 0),
+            child: Transform.rotate(angle: (fromLeft ? -0.14 : 0.14) * (1 - t), child: child),
+          ),
+        ),
+      );
 }

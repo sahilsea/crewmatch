@@ -2,76 +2,57 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../ui/ui.dart';
 
-/// The "welcome.txt" window above the sign-in form: three faces and the pitch.
+/// The top of the sign-in screen: three faces that pop in and float, and a
+/// one-line pitch.
 class WelcomeWindow extends StatelessWidget {
-  const WelcomeWindow({super.key});
+  const WelcomeWindow({super.key, this.registering = false});
+
+  /// Swaps the headline for the create-account one.
+  final bool registering;
 
   static String _face(String seed) =>
       'https://api.dicebear.com/9.x/notionists/png?seed=${Uri.encodeComponent(seed)}';
 
   @override
-  Widget build(BuildContext context) => RetroWindow(
-        title: 'welcome.txt',
-        inset: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              height: 104,
-              decoration: const BoxDecoration(border: Border(bottom: Frame.side)),
-              child: Halftone(
-                color: Palette.blue,
-                child: Center(
-                  child: SizedBox(
-                    width: 192,
-                    height: 80,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Positioned(
-                          left: 0,
-                          child: Avatar(url: _face('Tara Fernandes'), name: 'Tara', size: 70),
-                        ),
-                        Positioned(
-                          right: 0,
-                          child: Avatar(
-                            url: _face('Aisha Siddiqui'),
-                            name: 'Aisha',
-                            size: 70,
-                            background: Palette.pink,
-                          ),
-                        ),
-                        Avatar(
-                          url: _face('Aarav Sharma'),
-                          name: 'Aarav',
-                          size: 80,
-                          background: Palette.strip,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+  Widget build(BuildContext context) {
+    Widget face(String name, double size, Color background, int i) => PopIn(
+          delay: Duration(milliseconds: 120 * i),
+          child: Bob(
+            delay: Duration(milliseconds: 600 * i),
+            child: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: const BoxDecoration(color: Palette.desktop, shape: BoxShape.circle),
+              child: Avatar(url: _face(name), name: name, size: size, background: background),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                spacing: 8,
-                children: [
-                  Text(
-                    'Find the teammates your team is missing.',
-                    style: AppType.headline(size: 31),
-                  ),
-                  Text(
-                    'Swipe through students ranked by how well they fill your gaps. '
-                    'Match, form a crew, then score points at the hackathon.',
-                    style: AppType.body(),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
+        );
+    return Column(
+      spacing: 20,
+      children: [
+        SizedBox(
+          height: 104,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Transform.translate(offset: const Offset(16, 0), child: face('Tara Fernandes', 72, Palette.pink, 0)),
+              face('Aarav Sharma', 88, Palette.gold, 1),
+              Transform.translate(offset: const Offset(-16, 0), child: face('Aisha Siddiqui', 72, Palette.navy, 2)),
+            ],
+          ),
         ),
-      );
+        Rise(
+          delay: const Duration(milliseconds: 150),
+          child: AnimatedSwitcher(
+            duration: Motion.of(context, const Duration(milliseconds: 250)),
+            child: Text(
+              registering ? 'Create account' : 'Find your missing teammates',
+              key: ValueKey(registering),
+              textAlign: TextAlign.center,
+              style: AppType.title(size: 28).copyWith(height: 1.08),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }

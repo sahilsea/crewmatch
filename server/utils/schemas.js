@@ -47,6 +47,17 @@ export const createCrewSchema = z.object({
 
 export const addMemberSchema = z.object({ userId: objectId });
 
+export const createPostSchema = z.object({
+  text: z.string().trim().min(1).max(500),
+  tag: z.enum(['update', 'looking', 'win']).nullable().optional(),
+  // A data URL; the controller checks the type and size.
+  photo: z.string().max(4_500_000).nullable().optional(),
+});
+
+export const commentSchema = z.object({ text: z.string().trim().min(1).max(300) });
+
+export const messageSchema = z.object({ text: z.string().trim().min(1).max(1000) });
+
 // ISO date strings (or epoch milliseconds) from the admin form.
 const date = z.union([z.string(), z.number()]).pipe(z.coerce.date({ error: 'Invalid date' }));
 

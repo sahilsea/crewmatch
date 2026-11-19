@@ -11,6 +11,7 @@ export 'feedback.dart';
 export 'forms.dart';
 export 'glyphs.dart';
 export 'halftone.dart';
+export 'motion.dart';
 export 'palette.dart';
 export 'type.dart';
 export 'window.dart';

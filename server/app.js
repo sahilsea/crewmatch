@@ -20,6 +20,8 @@ app.use(helmet());
 app.use(cors({
   origin: (origin, cb) => cb(null, !origin || allowed.includes(origin) || (localDev && LOCALHOST.test(origin))),
 }));
+// Posts may carry a photo as a data URL; everything else stays small.
+app.use('/api/posts', express.json({ limit: '5mb' }));
 app.use(express.json({ limit: '100kb' }));
 if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'));
 

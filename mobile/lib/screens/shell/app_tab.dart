@@ -5,7 +5,7 @@ enum AppTab {
   discover('Discover', Glyph.discover),
   matches('Matches', Glyph.matches),
   crew('Crew', Glyph.crew),
-  events('Events', Glyph.events),
+  posts('Posts', Glyph.posts),
   ranks('Ranks', Glyph.ranks);
 
   const AppTab(this.label, this.glyph);

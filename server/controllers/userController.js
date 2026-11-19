@@ -1,6 +1,9 @@
 import User from '../models/User.js';
 import Crew from '../models/Crew.js';
 import Event from '../models/Event.js';
+import Post from '../models/Post.js';
+import Photo from '../models/Photo.js';
+import Message from '../models/Message.js';
 import { OPTIONS, MAX_SUPERPOWERS } from '../config/options.js';
 import { HttpError } from '../middleware/error.js';
 
@@ -36,6 +39,12 @@ export async function deleteAccount(req, res) {
   const id = req.user._id;
   await User.updateMany({}, { $pull: { swipedRight: id, swipedLeft: id, matches: id } });
   if (req.user.crew) await leaveCrewById(req.user.crew, id);
+  // Their posts, photos, likes and comments go too. Chat lines stay, unsigned.
+  await Promise.all([
+    Post.deleteMany({ author: id }),
+    Photo.deleteMany({ owner: id }),
+    Post.updateMany({}, { $pull: { likes: id, comments: { author: id } } }),
+  ]);
   await req.user.deleteOne();
   res.status(204).end();
 }
@@ -49,5 +58,6 @@ export async function leaveCrewById(crewId, userId) {
     await crew.deleteOne();
     // Its event and challenge entries go with it: they free a spot and leave the leaderboard.
     await Event.updateMany({ 'entries.crew': crew._id }, { $pull: { entries: { crew: crew._id } } });
+    await Message.deleteMany({ crew: crew._id });
   }
 }
