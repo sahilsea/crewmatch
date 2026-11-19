@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import mongoose from 'mongoose';
-import { OPTIONS, MAX_SUPERPOWERS, MAX_CREW_SIZE } from '../config/options.js';
+import {
+  OPTIONS, MAX_SUPERPOWERS, MAX_CREW_SIZE, EVENT_KINDS, EVENT_CATEGORIES,
+} from '../config/options.js';
 
 const objectId = z.string().refine((v) => mongoose.isValidObjectId(v), 'Invalid id');
 
@@ -44,3 +46,49 @@ export const createCrewSchema = z.object({
 });
 
 export const addMemberSchema = z.object({ userId: objectId });
+
+export const createPostSchema = z.object({
+  text: z.string().trim().min(1).max(500),
+  tag: z.enum(['update', 'looking', 'win']).nullable().optional(),
+  // A data URL; the controller checks the type and size.
+  photo: z.string().max(4_500_000).nullable().optional(),
+});
+
+export const commentSchema = z.object({ text: z.string().trim().min(1).max(300) });
+
+export const messageSchema = z.object({ text: z.string().trim().min(1).max(1000) });
+
+// ISO date strings (or epoch milliseconds) from the admin form.
+const date = z.union([z.string(), z.number()]).pipe(z.coerce.date({ error: 'Invalid date' }));
+
+// EventInput: the admin form for events and challenges. PATCH takes any subset.
+// The rules that span fields (category fits kind, endsAt after startsAt) live in
+// the Event model, so they hold for edits too.
+export const eventInputSchema = z
+  .object({
+    kind: z.enum(EVENT_KINDS),
+    title: z.string().trim().min(2).max(80),
+    summary: z.string().trim().min(1).max(140),
+    details: z.string().trim().max(2000),
+    category: z.enum(Object.values(EVENT_CATEGORIES).flat()),
+    location: z.string().trim().max(80),
+    startsAt: date,
+    endsAt: date,
+    points: z.number().int().min(0).max(1000),
+    capacity: z.number().int().min(1).max(500).nullable(),
+    // Empty or null on an event means "generate one".
+    checkinCode: z.string().trim().max(20).nullable(),
+  })
+  .partial({ details: true, location: true, capacity: true, checkinCode: true });
+
+export const checkinSchema = z.object({ code: z.string().trim().max(50) });
+
+export const submitSchema = z.object({
+  url: z.string().trim().max(500).pipe(z.url({ protocol: /^https?$/, error: 'Must be an http:// or https:// link' })),
+  note: z.string().trim().max(280).nullish(),
+});
+
+// Admins can override the points, e.g. for a podium bonus.
+export const approveSchema = z.object({ points: z.number().int().min(0).max(1000).optional() });
+
+export const rejectSchema = z.object({ note: z.string().trim().max(280).nullish() });

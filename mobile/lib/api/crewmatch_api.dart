@@ -1,0 +1,185 @@
+import '../models/auth_result.dart';
+import '../models/crew.dart';
+import '../models/deck.dart';
+import '../models/hub_event.dart';
+import '../models/json.dart';
+import '../models/leaderboard.dart';
+import '../models/post.dart';
+import '../models/profile_options.dart';
+import '../models/user.dart';
+import 'api_client.dart';
+
+/// Every endpoint the app uses, returning typed models.
+/// The shapes are documented in server/README.md and docs/hackathon-api.md.
+class CrewMatchApi {
+  CrewMatchApi(this.client);
+
+  final ApiClient client;
+
+  // Auth and profile
+
+  Future<AuthResult> login(String email, String password) async =>
+      AuthResult.fromJson(
+        await client.post('/auth/login', {'email': email, 'password': password}),
+      );
+
+  Future<AuthResult> register(String name, String email, String password) async =>
+      AuthResult.fromJson(
+        await client.post(
+          '/auth/register',
+          {'name': name, 'email': email, 'password': password},
+        ),
+      );
+
+  Future<User> me() async => _user(await client.get('/auth/me'));
+
+  Future<ProfileOptions> options() async =>
+      ProfileOptions.fromJson(await client.get('/options'));
+
+  /// Partial update: send only the fields that changed or were filled in.
+  Future<User> updateProfile(Map<String, Object?> changes) async =>
+      _user(await client.put('/users/me', changes));
+
+  // Deck and matches
+
+  Future<Deck> deck({int limit = 20}) async =>
+      Deck.fromJson(await client.get('/deck?limit=$limit'));
+
+  Future<SwipeResult> swipe(String targetId, SwipeDirection direction) async =>
+      SwipeResult.fromJson(
+        await client.post(
+          '/swipe',
+          {'targetId': targetId, 'direction': direction.name},
+        ),
+      );
+
+  /// Brings back everyone you passed on.
+  Future<void> resetPasses() async {
+    await client.post('/swipe/reset');
+  }
+
+  Future<List<User>> matches() async =>
+      User.listFrom((await client.get('/matches'))['matches']);
+
+  Future<void> unmatch(String userId) async {
+    await client.delete('/matches/$userId');
+  }
+
+  // Crew
+
+  Future<Crew?> myCrew() async =>
+      Crew.maybeFromJson((await client.get('/crews/mine'))['crew']);
+
+  Future<Crew> createCrew(String name, List<String> memberIds) async =>
+      _crew(await client.post('/crews', {'name': name, 'memberIds': memberIds}));
+
+  Future<Crew> renameCrew(String name) async =>
+      _crew(await client.patch('/crews/mine', {'name': name}));
+
+  Future<Crew> addCrewMember(String userId) async =>
+      _crew(await client.post('/crews/mine/members', {'userId': userId}));
+
+  /// Takes someone else out of your crew. The API refuses the last other
+  /// member (leave the crew instead).
+  Future<Crew> removeCrewMember(String userId) async =>
+      _crew(await client.delete('/crews/mine/members/${Uri.encodeComponent(userId)}'));
+
+  /// A crew left with one person is dissolved.
+  Future<void> leaveCrew() async {
+    await client.delete('/crews/mine');
+  }
+
+  // Hackathon hub
+
+  Future<List<HubEvent>> events({EventKind? kind}) async => HubEvent.listFrom(
+        (await client.get(kind == null ? '/events' : '/events?kind=${kind.name}'))['events'],
+      );
+
+  Future<HubEvent> joinEvent(String id) async =>
+      _event(await client.post('/events/$id/join'));
+
+  Future<HubEvent> leaveEvent(String id) async =>
+      _event(await client.delete('/events/$id/join'));
+
+  Future<CheckInResult> checkIn(String id, String code) async =>
+      CheckInResult.fromJson(
+        await client.post('/events/$id/checkin', {'code': code}),
+      );
+
+  Future<HubEvent> submitChallenge(String id, {required String url, String? note}) async =>
+      _event(
+        await client.post('/events/$id/submit', {
+          'url': url,
+          if (note != null && note.isNotEmpty) 'note': note,
+        }),
+      );
+
+  /// The live leaderboard, or another hackathon's with [hackathonId].
+  Future<Leaderboard> leaderboard([String? hackathonId]) async => Leaderboard.fromJson(
+        await client.get(
+          hackathonId == null || hackathonId == Hackathon.currentId
+              ? '/leaderboard'
+              : '/hackathons/${Uri.encodeComponent(hackathonId)}/leaderboard',
+        ),
+      );
+
+  Future<HackathonList> hackathons() async =>
+      HackathonList.fromJson(await client.get('/hackathons'));
+
+  // Hackathon feed
+
+  /// Newest first; pass the oldest post's time as [before] for the next page.
+  Future<PostPage> posts({DateTime? before}) async => PostPage.fromJson(
+        await client.get('/posts${before == null ? '' : '?before=${Uri.encodeQueryComponent(before.toUtc().toIso8601String())}'}'),
+      );
+
+  /// [photo] is a `data:image/…;base64,` URL.
+  Future<Post> createPost(String text, {PostTag? tag, String? photo}) async => _post(
+        await client.post('/posts', {
+          'text': text,
+          if (tag != null) 'tag': tag.name,
+          'photo': ?photo,
+        }),
+      );
+
+  Future<void> deletePost(String id) async {
+    await client.delete('/posts/${Uri.encodeComponent(id)}');
+  }
+
+  Future<Post> toggleLike(String id) async => _post(await client.post('/posts/${Uri.encodeComponent(id)}/like'));
+
+  Future<List<PostComment>> comments(String postId) async => [
+        for (final c in objectList((await client.get('/posts/${Uri.encodeComponent(postId)}/comments'))['comments']))
+          PostComment.fromJson(c),
+      ];
+
+  Future<Post> addComment(String postId, String text) async =>
+      _post(await client.post('/posts/${Uri.encodeComponent(postId)}/comments', {'text': text}));
+
+  /// A photo path from a post as a full URL.
+  String photoUrl(String path) => client.resolve(path);
+
+  // Crew chat
+
+  /// The latest messages, oldest first; with [after], only newer ones.
+  Future<List<ChatMessage>> messages({DateTime? after}) async => [
+        for (final m in objectList((await client.get(
+          '/crews/mine/messages${after == null ? '' : '?after=${Uri.encodeQueryComponent(after.toUtc().toIso8601String())}'}',
+        ))['messages']))
+          ChatMessage.fromJson(m),
+      ];
+
+  Future<ChatMessage> sendMessage(String text) async =>
+      ChatMessage.fromJson((await client.post('/crews/mine/messages', {'text': text}))['message'] as Map<String, dynamic>);
+
+  static Post _post(Map<String, dynamic> json) => Post.fromJson(json['post'] as Map<String, dynamic>);
+
+  static User _user(Map<String, dynamic> json) =>
+      User.fromJson(json['user'] as Map<String, dynamic>);
+
+  static Crew _crew(Map<String, dynamic> json) =>
+      Crew.fromJson(json['crew'] as Map<String, dynamic>);
+
+  static HubEvent _event(Map<String, dynamic> json) =>
+      HubEvent.fromJson(json['event'] as Map<String, dynamic>);
+}

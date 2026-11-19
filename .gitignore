@@ -10,3 +10,6 @@ client/dist/
 mobile/.dart_tool/
 mobile/build/
 mobile/.flutter-plugins*
+
+# Local persistent dev database (LOCAL_DB_DIR)
+server/.data/
