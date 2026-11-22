@@ -1,3 +1,6 @@
+import '../../models/team_request.dart';
+import '../../state/incoming_link.dart';
+import '../people/person_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../crew/crew_screen.dart';
@@ -31,6 +34,18 @@ class _HomeShellState extends State<HomeShell> {
 
   /// Tabs opened so far; the others aren't built until you visit them.
   late final _opened = <AppTab>{_tab};
+
+  @override
+  void initState() {
+    super.initState();
+    // Opened from a profile link: show that person once you're in.
+    final handle = IncomingLink.take();
+    if (handle != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.of(context).push(PersonScreen.route(handle, source: RequestSource.link));
+      });
+    }
+  }
 
   /// Bumped to rebuild one tab from scratch.
   final _generation = {for (final tab in AppTab.values) tab: 0};

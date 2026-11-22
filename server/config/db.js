@@ -43,6 +43,11 @@ export async function connectDB() {
       await seedDatabase();
     }
   }
+
+  // Profile links need a handle; older accounts get one on the first start.
+  const { default: User } = await import('../models/User.js');
+  const filled = await User.backfillHandles();
+  if (filled && process.env.NODE_ENV !== 'test') console.log(`Gave ${filled} accounts a profile handle`);
 }
 
 export async function disconnectDB() {

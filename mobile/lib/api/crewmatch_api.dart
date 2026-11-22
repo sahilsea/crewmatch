@@ -6,6 +6,7 @@ import '../models/hub_event.dart';
 import '../models/json.dart';
 import '../models/leaderboard.dart';
 import '../models/post.dart';
+import '../models/team_request.dart';
 import '../models/profile_options.dart';
 import '../models/user.dart';
 import 'api_client.dart';
@@ -117,6 +118,46 @@ class CrewMatchApi {
   /// A crew left with one person is dissolved.
   Future<void> leaveCrew() async {
     await client.delete('/crews/mine');
+  }
+
+  // Finding people: search, profile links and team-up requests
+
+  Future<List<User>> searchPeople({String query = '', bool noCrew = false, String? role}) async {
+    final params = {if (query.trim().isNotEmpty) 'q': query.trim(), if (noCrew) 'free': '1', 'role': ?role};
+    final path = params.isEmpty ? '/users/search' : '/users/search?${Uri(queryParameters: params).query}';
+    return User.listFrom((await client.get(path))['results']);
+  }
+
+  /// Someone's profile from their link handle. [isMe] when it's your own.
+  Future<({User user, bool isMe})> personByHandle(String handle) async {
+    final json = await client.get('/users/handle/${Uri.encodeComponent(handle)}');
+    return (user: User.fromJson(json['user'] as Map<String, dynamic>), isMe: json['isMe'] == true);
+  }
+
+  /// What anyone sees from a profile link, signed in or not.
+  Future<User> publicProfile(String handle) async {
+    final json = (await client.get('/public/u/${Uri.encodeComponent(handle)}'))['user'] as Map<String, dynamic>;
+    return User.fromJson({'id': json['handle'], ...json});
+  }
+
+  Future<SendResult> sendRequest(String userId, {String note = '', RequestSource source = RequestSource.profile}) async {
+    final json = await client.post('/requests', {'to': userId, if (note.trim().isNotEmpty) 'note': note.trim(), 'source': source.name});
+    final user = json['user'];
+    return (match: json['match'] == true, user: user is Map<String, dynamic> ? User.fromJson(user) : null);
+  }
+
+  Future<RequestLists> requests() async => RequestLists.fromJson(await client.get('/requests'));
+
+  /// Accepting matches you; returns the new match.
+  Future<User> acceptRequest(String id) async =>
+      User.fromJson((await client.post('/requests/$id/accept'))['user'] as Map<String, dynamic>);
+
+  Future<void> declineRequest(String id) async {
+    await client.post('/requests/$id/decline');
+  }
+
+  Future<void> withdrawRequest(String id) async {
+    await client.delete('/requests/$id');
   }
 
   // Hackathon hub

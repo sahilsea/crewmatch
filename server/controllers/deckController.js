@@ -3,9 +3,10 @@ import Crew from '../models/Crew.js';
 import { compatibility, reasonTags } from '../utils/matching.js';
 import { MIN_DECK_SCORE } from '../config/options.js';
 import { HttpError } from '../middleware/error.js';
+import TeamRequest from '../models/TeamRequest.js';
 
 // The profiles the deck scores against: your whole crew if you have one, else just you.
-async function teamFor(user) {
+export async function teamFor(user) {
   if (!user.crew) return [user];
   const crew = await Crew.findById(user.crew).populate('members');
   return crew?.members.length ? crew.members : [user];
@@ -56,13 +57,11 @@ export async function swipe(req, res) {
     const likedBack = target.autoLike || target.swipedRight.some((id) => id.equals(me._id));
     if (likedBack) {
       match = true;
-      await Promise.all([
-        User.updateOne({ _id: me._id }, { $addToSet: { matches: target._id } }),
-        User.updateOne(
-          { _id: target._id },
-          { $addToSet: { matches: me._id, swipedRight: me._id } }
-        ),
-      ]);
+      const { makeMatch } = await import('./requestController.js');
+      await makeMatch(me._id, target._id);
+    } else if (!(await TeamRequest.exists({ from: me._id, to: target._id, status: { $in: ['pending', 'declined'] } }))) {
+      // A right swipe shows up in their Requests, so they can say yes.
+      await TeamRequest.create({ from: me._id, to: target._id, source: 'discover' });
     }
   }
 

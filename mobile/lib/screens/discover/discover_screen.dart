@@ -1,3 +1,5 @@
+import '../people/search_screen.dart';
+
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -64,11 +66,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       if (result.match && mounted) {
         final me = session.user!;
         session.updateUser(me.copyWith(matchCount: me.matchCount + 1));
-        final seeMatches = await showMatchDialog(
-          context,
-          me: me,
-          them: result.user ?? person,
-        );
+        final seeMatches = await showMatchDialog(context, me: me, them: result.user ?? person);
         if (seeMatches) widget.onOpen(AppTab.matches);
       }
     } on ApiException catch (e) {
@@ -92,10 +90,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final cards = _cards;
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
-            _stack.currentState?.swipe(SwipeDirection.left),
-        const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
-            _stack.currentState?.swipe(SwipeDirection.right),
+        const SingleActivator(LogicalKeyboardKey.arrowLeft): () => _stack.currentState?.swipe(SwipeDirection.left),
+        const SingleActivator(LogicalKeyboardKey.arrowRight): () => _stack.currentState?.swipe(SwipeDirection.right),
       },
       child: Focus(
         autofocus: true,
@@ -104,28 +100,31 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           children: [
             ScreenHeader(
               title: 'Discover',
-              trailing: IconButton(
-                tooltip: 'How ranking works',
-                onPressed: () => showRankingSheet(context),
-                style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
-                icon: const Icon(Icons.info_outline_rounded, color: Palette.muted),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'Find people',
+                    onPressed: () => Navigator.of(context).push(SearchScreen.route()),
+                    style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+                    icon: const Icon(Icons.search_rounded),
+                  ),
+                  IconButton(
+                    tooltip: 'How ranking works',
+                    onPressed: () => showRankingSheet(context),
+                    style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+                    icon: const Icon(Icons.info_outline_rounded, color: Palette.muted),
+                  ),
+                ],
               ),
             ),
             Expanded(
               child: Padding(
-                padding: widget.wide
-                    ? const EdgeInsets.fromLTRB(24, 4, 32, 24)
-                    : const EdgeInsets.fromLTRB(16, 4, 16, 14),
+                padding: widget.wide ? const EdgeInsets.fromLTRB(24, 4, 32, 24) : const EdgeInsets.fromLTRB(16, 4, 16, 14),
                 child: switch (cards) {
-                  null when _error != null => ErrorView(
-                    error: _error!,
-                    onRetry: _retry,
-                  ),
+                  null when _error != null => ErrorView(error: _error!, onRetry: _retry),
                   null => const LoadingView(message: 'Ranking your best fits…'),
-                  [] => _EmptyDeck(
-                    onShowPassed: _showPassedAgain,
-                    onSeeMatches: () => widget.onOpen(AppTab.matches),
-                  ),
+                  [] => _EmptyDeck(onShowPassed: _showPassedAgain, onSeeMatches: () => widget.onOpen(AppTab.matches)),
                   final List<User> deck =>
                     widget.wide
                         ? Row(
@@ -134,10 +133,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                               SizedBox(width: 440, child: _deckColumn(deck)),
                               const SizedBox(width: 28),
                               Expanded(
-                                child: _FitPanel(
-                                  key: ValueKey(deck.first.id),
-                                  person: deck.first,
-                                ),
+                                child: _FitPanel(key: ValueKey(deck.first.id), person: deck.first),
                               ),
                             ],
                           )
@@ -156,13 +152,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     spacing: 14,
     children: [
       Expanded(
-        child: SwipeStack(
-          key: _stack,
-          cards: deck,
-          seen: _seen,
-          total: _total,
-          onSwiped: _onSwiped,
-        ),
+        child: SwipeStack(key: _stack, cards: deck, seen: _seen, total: _total, onSwiped: _onSwiped),
       ),
       Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -172,11 +162,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             label: 'Pass',
             size: 64,
             onPressed: () => _stack.currentState?.swipe(SwipeDirection.left),
-            child: const Icon(
-              Icons.close_rounded,
-              size: 28,
-              color: Palette.muted,
-            ),
+            child: const Icon(Icons.close_rounded, size: 28, color: Palette.muted),
           ),
           Pulse(
             minScale: 0.94,
@@ -186,11 +172,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               size: 72,
               primary: true,
               onPressed: () => _stack.currentState?.swipe(SwipeDirection.right),
-              child: const Icon(
-                Icons.favorite_rounded,
-                size: 32,
-                color: Palette.onCrimson,
-              ),
+              child: const Icon(Icons.favorite_rounded, size: 32, color: Palette.onCrimson),
             ),
           ),
         ],
@@ -206,13 +188,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
 /// The round Pass and Like buttons under the card.
 class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    required this.label,
-    required this.size,
-    required this.onPressed,
-    required this.child,
-    this.primary = false,
-  });
+  const _ActionButton({required this.label, required this.size, required this.onPressed, required this.child, this.primary = false});
 
   final String label;
   final double size;
@@ -226,11 +202,7 @@ class _ActionButton extends StatelessWidget {
     label: label,
     child: Material(
       color: primary ? Palette.crimson : Palette.desktop,
-      shape: CircleBorder(
-        side: primary
-            ? BorderSide.none
-            : const BorderSide(color: Palette.dashed, width: 1.5),
-      ),
+      shape: CircleBorder(side: primary ? BorderSide.none : const BorderSide(color: Palette.dashed, width: 1.5)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onPressed,
@@ -256,14 +228,8 @@ class _EmptyDeck extends StatelessWidget {
         title: "You've seen everyone",
         message: 'Check back soon.',
         actions: [
-          FilledButton(
-            onPressed: onShowPassed,
-            child: const Text('Show passed people'),
-          ),
-          OutlinedButton(
-            onPressed: onSeeMatches,
-            child: const Text('See matches'),
-          ),
+          FilledButton(onPressed: onShowPassed, child: const Text('Show passed people')),
+          OutlinedButton(onPressed: onSeeMatches, child: const Text('See matches')),
         ],
       ),
     ),
@@ -290,18 +256,11 @@ class _FitPanel extends StatelessWidget {
     Widget chips(List<String> items, Color color, Color text) => Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: [
-        for (final i in items)
-          InfoTag(optionLabel(i), color: color, textColor: text),
-      ],
+      children: [for (final i in items) InfoTag(optionLabel(i), color: color, textColor: text)],
     );
     return Rise(
       child: Container(
-        decoration: const BoxDecoration(
-          color: Palette.window,
-          borderRadius: Frame.radius,
-          border: Frame.border,
-        ),
+        decoration: const BoxDecoration(color: Palette.window, borderRadius: Frame.radius, border: Frame.border),
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -314,33 +273,15 @@ class _FitPanel extends StatelessWidget {
                     Row(
                       spacing: 8,
                       children: [
-                        const Icon(
-                          Icons.check_circle_rounded,
-                          size: 18,
-                          color: Palette.gold,
-                        ),
-                        Expanded(
-                          child: Text(tag, style: AppType.body(size: 15)),
-                        ),
+                        const Icon(Icons.check_circle_rounded, size: 18, color: Palette.gold),
+                        Expanded(child: Text(tag, style: AppType.body(size: 15))),
                       ],
                     ),
                 ]),
-              if (person.bio.isNotEmpty)
-                section('About', [
-                  Text(person.bio, style: AppType.body(size: 16, height: 1.55)),
-                ]),
-              if (person.superpowers.isNotEmpty)
-                section('Superpowers', [
-                  chips(person.superpowers, Palette.navy, Palette.cream),
-                ]),
-              if (person.skills.isNotEmpty)
-                section('Skills', [
-                  chips(person.skills, Palette.strip, Palette.ink),
-                ]),
-              if (person.interests.isNotEmpty)
-                section('Interests', [
-                  chips(person.interests, Palette.pink, Palette.onPink),
-                ]),
+              if (person.bio.isNotEmpty) section('About', [Text(person.bio, style: AppType.body(size: 16, height: 1.55))]),
+              if (person.superpowers.isNotEmpty) section('Superpowers', [chips(person.superpowers, Palette.navy, Palette.cream)]),
+              if (person.skills.isNotEmpty) section('Skills', [chips(person.skills, Palette.strip, Palette.ink)]),
+              if (person.interests.isNotEmpty) section('Interests', [chips(person.interests, Palette.pink, Palette.onPink)]),
               PersonActivity(userId: person.id),
             ],
           ),
@@ -352,41 +293,43 @@ class _FitPanel extends StatelessWidget {
 
 /// Why people are in this order: the three parts of the fit score.
 Future<void> showRankingSheet(BuildContext context) => showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            spacing: 18,
-            children: [
-              Text('How we rank', style: AppType.title(size: 22)),
-              for (final (i, (label, share, hint)) in const [
-                ('Complementary skills', 50, 'They cover what your crew is missing'),
-                ('Work style', 30, 'Same schedule, commitment and way of talking'),
-                ('Shared interests', 20, 'You care about the same problems'),
-              ].indexed)
-                Rise(
-                  delay: Motion.stagger(i),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    spacing: 6,
+  context: context,
+  showDragHandle: true,
+  builder: (context) => SafeArea(
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 18,
+        children: [
+          Text('How we rank', style: AppType.title(size: 22)),
+          for (final (i, (label, share, hint)) in const [
+            ('Complementary skills', 50, 'They cover what your crew is missing'),
+            ('Work style', 30, 'Same schedule, commitment and way of talking'),
+            ('Shared interests', 20, 'You care about the same problems'),
+          ].indexed)
+            Rise(
+              delay: Motion.stagger(i),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: 6,
+                children: [
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          Expanded(child: Text(label, style: AppType.body(size: 15, weight: FontWeight.w500))),
-                          Text('$share%', style: AppType.body(size: 15, weight: FontWeight.w700)),
-                        ],
+                      Expanded(
+                        child: Text(label, style: AppType.body(size: 15, weight: FontWeight.w500)),
                       ),
-                      ThinProgressBar(value: share / 50),
-                      Text(hint, style: AppType.body(size: 13, color: Palette.muted)),
+                      Text('$share%', style: AppType.body(size: 15, weight: FontWeight.w700)),
                     ],
                   ),
-                ),
-            ],
-          ),
-        ),
+                  ThinProgressBar(value: share / 50),
+                  Text(hint, style: AppType.body(size: 13, color: Palette.muted)),
+                ],
+              ),
+            ),
+        ],
       ),
-    );
+    ),
+  ),
+);

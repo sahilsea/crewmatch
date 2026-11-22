@@ -9,6 +9,9 @@ import '../../ui/ui.dart';
 import '../../util/parallel.dart';
 import '../shell/app_tab.dart';
 import 'match_tile.dart';
+import '../people/requests_pane.dart';
+import '../people/search_screen.dart';
+import '../../models/team_request.dart';
 
 /// People who swiped right on you too, with unmatch and add-to-crew.
 class MatchesScreen extends StatefulWidget {
@@ -29,6 +32,11 @@ class _MatchesScreenState extends State<MatchesScreen> {
   String? _selectedId;
   Object? _error;
 
+  /// Team-up requests, shown on the Requests tab.
+  RequestLists? _requests;
+  var _onRequests = false;
+  var _tabPicked = false;
+
   @override
   void initState() {
     super.initState();
@@ -38,12 +46,18 @@ class _MatchesScreenState extends State<MatchesScreen> {
   Future<void> _load() async {
     final api = context.api;
     try {
+      // Requests are extra: if they fail to load, Matches still shows.
+      final requests = api.requests().then<RequestLists?>((r) => r, onError: (_) => null);
       final (matches, crew) = await waitBoth(api.matches(), api.myCrew());
+      final lists = await requests;
       if (!mounted) return;
       setState(() {
         _matches = matches;
         _crew = crew;
+        _requests = lists;
         _error = null;
+        // Open on Requests the first time when someone is waiting.
+        if (!_tabPicked && (lists?.incoming.isNotEmpty ?? false)) _onRequests = true;
       });
     } catch (e) {
       if (mounted) setState(() => _error = e);
@@ -121,13 +135,50 @@ class _MatchesScreenState extends State<MatchesScreen> {
       children: [
         ScreenHeader(
           title: 'Matches',
-          trailing: matches == null || matches.isEmpty ? null : Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: CountBadge(matches.length),
+          trailing: IconButton(
+            tooltip: 'Find people',
+            onPressed: () => Navigator.of(context).push(SearchScreen.route()).then((_) => _load()),
+            icon: const Icon(Icons.search_rounded),
           ),
         ),
+        if (matches != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: SegmentedButton<bool>(
+              segments: [
+                ButtonSegment(value: false, label: Text('Matches · ${matches.length}')),
+                ButtonSegment(
+                  value: true,
+                  label: Badge(
+                    isLabelVisible: (_requests?.incoming.length ?? 0) > 0,
+                    label: Text('${_requests?.incoming.length ?? 0}'),
+                    backgroundColor: Palette.crimson,
+                    textColor: Palette.onCrimson,
+                    offset: const Offset(18, -6),
+                    child: const Text('Requests'),
+                  ),
+                ),
+              ],
+              selected: {_onRequests},
+              showSelectedIcon: false,
+              onSelectionChanged: (s) => setState(() {
+                _onRequests = s.first;
+                _tabPicked = true;
+              }),
+            ),
+          ),
         Expanded(
-          child: switch (matches) {
+          child: _onRequests && _requests != null
+              ? RefreshIndicator(
+                  onRefresh: _load,
+                  child: RequestsPane(
+                    key: ValueKey(_requests),
+                    lists: _requests!,
+                    onChanged: _load,
+                    onMatched: (_) => context.session.refreshUser(),
+                  ),
+                )
+              : switch (matches) {
             null when _error != null => ErrorView(error: _error!, onRetry: _retry),
             null => const LoadingView(),
             [] => Center(

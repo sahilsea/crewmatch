@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
+import TeamRequest from '../models/TeamRequest.js';
 import Crew from '../models/Crew.js';
 import Event from '../models/Event.js';
 import Post from '../models/Post.js';
@@ -374,8 +375,25 @@ async function seedStudentEvents() {
   return Event.create(STUDENT_EVENTS.map(([name, e]) => ({ ...e, points: 0, createdBy: idOf[name] })));
 }
 
+// Team-up requests waiting for the demo accounts: [from, note, source].
+const DEMO_REQUESTS = [
+  ['Aarav Sharma', 'Saw your demo at the expo. Want to build the Flutter side together?', 'qr'],
+  ['Kabir Mehta', 'I can do the UI if you need a designer.', 'search'],
+  ['Nisha Verma', '', 'discover'],
+];
+
+async function seedRequests() {
+  const demos = await User.find({ email: { $in: ['web@crewmatch.dev', 'mobile@crewmatch.dev'] } }, '_id');
+  const senders = await User.find({ name: { $in: DEMO_REQUESTS.map(([n]) => n) } }, 'name');
+  const idOf = Object.fromEntries(senders.map((u) => [u.name, u._id]));
+  const docs = demos.flatMap((d) => DEMO_REQUESTS.map(([name, note, source], i) => ({
+    from: idOf[name], to: d._id, note, source, createdAt: new Date(Date.now() - (10 + i * 60) * 60 * 1000),
+  })));
+  await TeamRequest.insertMany(docs.filter((r) => r.from));
+}
+
 export async function seedDatabase() {
-  await Promise.all([User.deleteMany({}), Crew.deleteMany({}), Event.deleteMany({}), Post.deleteMany({}), Message.deleteMany({})]);
+  await Promise.all([User.deleteMany({}), Crew.deleteMany({}), Event.deleteMany({}), Post.deleteMany({}), Message.deleteMany({}), TeamRequest.deleteMany({})]);
 
   // Insert with one shared hash: insertMany skips the save hook, and hashing 30 times is slow.
   const password = await bcrypt.hash(SEED_PASSWORD, 10);
@@ -390,6 +408,8 @@ export async function seedDatabase() {
   const crewIds = await seedCrews();
   const events = await seedEvents(crewIds);
   const hosted = await seedStudentEvents();
+  await User.backfillHandles();
+  await seedRequests();
   await seedFeed(crewIds);
   await seedCards();
 

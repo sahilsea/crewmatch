@@ -1,3 +1,5 @@
+import '../people/share_card_screen.dart';
+
 import 'package:material_ui/material_ui.dart';
 
 import '../../state/appearance.dart';
@@ -26,10 +28,7 @@ class TopMenuBar extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Semantics(
-                header: true,
-                child: Text('CrewMatch', style: AppType.title(size: 20)),
-              ),
+              child: Semantics(header: true, child: Text('CrewMatch', style: AppType.title(size: 20))),
             ),
           ),
         ),
@@ -55,12 +54,7 @@ class MenuBarText extends StatelessWidget {
 /// Asks first, then signs out and goes back to the sign-in screen.
 Future<void> confirmSignOut(BuildContext context) async {
   final session = context.session;
-  final yes = await confirmAction(
-    context,
-    title: 'Log out',
-    message: 'Log out of CrewMatch on this device?',
-    confirmLabel: 'Log out',
-  );
+  final yes = await confirmAction(context, title: 'Log out', message: 'Log out of CrewMatch on this device?', confirmLabel: 'Log out');
   if (yes) await session.signOut(notice: 'You have logged out.');
 }
 
@@ -71,14 +65,11 @@ class LogOutButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(right: 8),
-    child: TextButton(
-      onPressed: () => confirmSignOut(context),
-      child: const Text('Log out'),
-    ),
+    child: TextButton(onPressed: () => confirmSignOut(context), child: const Text('Log out')),
   );
 }
 
-enum _AccountAction { card, profile, light, dark, system, signOut }
+enum _AccountAction { share, card, profile, light, dark, system, signOut }
 
 /// The avatar on the right of the menu bar, opening Profile / Log out.
 class AccountMenu extends StatelessWidget {
@@ -93,6 +84,8 @@ class AccountMenu extends StatelessWidget {
       offset: const Offset(0, 6),
       onSelected: (action) {
         switch (action) {
+          case _AccountAction.share:
+            Navigator.of(context).push(ShareCardScreen.route());
           case _AccountAction.card:
             Navigator.of(context).push(CardEditorScreen.route());
           case _AccountAction.profile:
@@ -112,6 +105,7 @@ class AccountMenu extends StatelessWidget {
         return [
           // Organisers have no student card or profile.
           if (user?.isAdmin != true) ...[
+            const PopupMenuItem(value: _AccountAction.share, child: Text('Share my card')),
             const PopupMenuItem(value: _AccountAction.card, child: Text('Your card')),
             const PopupMenuItem(value: _AccountAction.profile, child: Text('Profile')),
             const PopupMenuDivider(),
@@ -135,11 +129,7 @@ class AccountMenu extends StatelessWidget {
       child: SizedBox(
         width: 56,
         child: Center(
-          child: Avatar(
-            url: user?.avatar ?? '',
-            name: user?.name ?? '',
-            size: 34,
-          ),
+          child: Avatar(url: user?.avatar ?? '', name: user?.name ?? '', size: 34),
         ),
       ),
     );

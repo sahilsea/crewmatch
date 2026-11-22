@@ -4,7 +4,7 @@ import { validate } from '../middleware/validate.js';
 import {
   registerSchema, loginSchema, profileSchema, swipeSchema, createCrewSchema, addMemberSchema,
   eventInputSchema, studentEventSchema, officialSchema, checkinSchema, submitSchema, approveSchema, rejectSchema,
-  createPostSchema, commentSchema, messageSchema, photoUploadSchema, verifySchema, googleSchema,
+  createPostSchema, commentSchema, messageSchema, photoUploadSchema, verifySchema, googleSchema, teamRequestSchema,
 } from '../utils/schemas.js';
 import { register, login, googleSignIn, me, verifyEmail, resendCode } from '../controllers/authController.js';
 import {
@@ -19,6 +19,9 @@ import {
   adminListEvents, createEvent, updateEvent, deleteEvent, approveEntry, rejectEntry,
 } from '../controllers/eventController.js';
 import { getStats, listUsers } from '../controllers/adminController.js';
+import {
+  searchUsers, getByHandle, publicProfile, sendRequest, listRequests, acceptRequest, declineRequest, withdrawRequest,
+} from '../controllers/requestController.js';
 import { listHackathons, getHackathonLeaderboard } from '../controllers/hackathonController.js';
 import {
   listPosts, listUserPosts, createPost, deletePost, toggleLike, listComments, addComment, getPhoto,
@@ -35,6 +38,7 @@ router.post('/auth/register', validate(registerSchema), register);
 router.post('/auth/login', validate(loginSchema), login);
 router.post('/auth/google', validate(googleSchema), googleSignIn);
 router.get('/photos/:id', getPhoto);
+router.get('/public/u/:handle', publicProfile);
 
 // Everything below needs a signed-in user
 router.use(protect);
@@ -52,6 +56,14 @@ router.post('/users/me/avatar', validate(photoUploadSchema), uploadAvatar);
 router.delete('/users/me/avatar', removeAvatar);
 router.post('/users/me/cover', validate(photoUploadSchema), uploadCover);
 router.delete('/users/me/cover', removeCover);
+// Finding people: search, profile links and team-up requests (before /users/:id).
+router.get('/users/search', searchUsers);
+router.get('/users/handle/:handle', getByHandle);
+router.get('/requests', listRequests);
+router.post('/requests', validate(teamRequestSchema), sendRequest);
+router.post('/requests/:id/accept', acceptRequest);
+router.post('/requests/:id/decline', declineRequest);
+router.delete('/requests/:id', withdrawRequest);
 router.get('/users/:id', getUser);
 router.get('/users/:id/posts', listUserPosts);
 router.get('/users/:id/activity', getActivity);

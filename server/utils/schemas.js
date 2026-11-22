@@ -135,6 +135,12 @@ export const studentEventSchema = z
 
 export const officialSchema = z.object({ points: z.number().int().min(0).max(1000).optional() });
 
+export const teamRequestSchema = z.object({
+  to: z.string().trim().min(1).max(40),
+  note: z.string().trim().max(140).optional(),
+  source: z.enum(['discover', 'search', 'profile', 'link', 'qr']).optional(),
+});
+
 export const checkinSchema = z.object({ code: z.string().trim().max(50) });
 
 export const submitSchema = z.object({

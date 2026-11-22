@@ -1,5 +1,8 @@
 import 'json.dart';
 
+/// Where you stand with someone: nothing yet, a request either way, or matched.
+enum Relation { none, sent, received, matched }
+
 /// A student as the API returns them.
 ///
 /// One shape serves several endpoints. Everyone has the public profile
@@ -34,6 +37,10 @@ class User {
     this.coverUrl,
     this.accent = 'crimson',
     this.cardFields = const ['superpowers', 'skills', 'experience'],
+    this.handle,
+    this.crewName,
+    this.relation,
+    this.requestId,
   });
 
   factory User.fromJson(Map<String, dynamic> json) => User(
@@ -63,6 +70,10 @@ class User {
         coverUrl: json['coverUrl'] as String?,
         accent: json['accent'] as String? ?? 'crimson',
         cardFields: json['cardFields'] == null ? const ['superpowers', 'skills', 'experience'] : stringList(json['cardFields']),
+        handle: json['handle'] as String?,
+        crewName: json['crewName'] as String?,
+        relation: enumByName(Relation.values, json['relation'], Relation.none),
+        requestId: json['requestId'] as String?,
       );
 
   static List<User> listFrom(Object? json) =>
@@ -109,7 +120,20 @@ class User {
   final String accent;
   final List<String> cardFields;
 
+  /// The short name in their profile link, e.g. `tara-fernandes`.
+  final String? handle;
+
+  /// Search and profiles: the crew they're in, if any.
+  final String? crewName;
+
+  /// Search and profiles: where you stand with them.
+  final Relation? relation;
+
+  /// The pending request between you, when [relation] is sent or received.
+  final String? requestId;
+
   User copyWith({
+    Relation? relation,
     bool? inCrew,
     int? matchCount,
     String? headline,
@@ -144,5 +168,9 @@ class User {
         coverUrl: coverUrl,
         accent: accent ?? this.accent,
         cardFields: cardFields ?? this.cardFields,
+        handle: handle,
+        crewName: crewName,
+        relation: relation ?? this.relation,
+        requestId: requestId,
       );
 }
