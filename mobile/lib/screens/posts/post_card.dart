@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../models/post.dart';
 import '../../state/session.dart';
+import '../people/people_ui.dart';
 import '../../ui/ui.dart';
 import '../../util/when.dart';
 
@@ -38,7 +39,11 @@ class PostCard extends StatelessWidget {
           Row(
             spacing: 10,
             children: [
-              Avatar(url: p.author.avatar, name: p.author.name, size: 40, background: Palette.pink),
+              ProfileTap(
+                userId: p.author.id,
+                name: p.author.name,
+                child: Avatar(url: p.author.avatar, name: p.author.name, size: 40, background: Palette.pink),
+              ),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../models/crew.dart';
 import '../../models/user.dart';
+import '../people/people_ui.dart';
 import '../../ui/ui.dart';
 import '../../util/labels.dart';
 import 'person_activity.dart';
@@ -57,7 +58,12 @@ class MatchTile extends StatelessWidget {
                   shape: BoxShape.circle,
                   border: Border.all(color: added ? Palette.gold : Colors.transparent, width: 2),
                 ),
-                child: Avatar(url: person.avatar, name: person.name, size: 46, background: Palette.pink),
+                child: ProfileTap(
+                  userId: person.id,
+                  handle: person.handle,
+                  name: person.name,
+                  child: Avatar(url: person.avatar, name: person.name, size: 46, background: Palette.pink),
+                ),
               ),
               Expanded(
                 child: Column(
@@ -193,7 +199,12 @@ class MatchDetails extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
-              child: Avatar(url: person.avatar, name: person.name, size: large ? 112 : 56, background: Palette.pink),
+              child: ProfileTap(
+                userId: person.id,
+                handle: person.handle,
+                name: person.name,
+                child: Avatar(url: person.avatar, name: person.name, size: large ? 112 : 56, background: Palette.pink),
+              ),
             ),
             Expanded(
               child: Column(

@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../api/api_exception.dart';
 import '../../models/post.dart';
 import '../../state/session.dart';
+import '../people/people_ui.dart';
 import '../../ui/ui.dart';
 import '../../util/when.dart';
 
@@ -154,7 +155,11 @@ class _CommentRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           spacing: 10,
           children: [
-            Avatar(url: comment.author.avatar, name: comment.author.name, size: 32, background: Palette.high),
+            ProfileTap(
+              userId: comment.author.id,
+              name: comment.author.name,
+              child: Avatar(url: comment.author.avatar, name: comment.author.name, size: 32, background: Palette.high),
+            ),
             Flexible(
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

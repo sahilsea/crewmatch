@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../models/user.dart';
+import '../people/people_ui.dart';
 import '../../ui/ui.dart';
 
 /// "It's a match!" as a full screen. Resolves to true when the user wants to
@@ -146,7 +147,12 @@ class _Pair extends StatelessWidget {
     Widget face(User user, Color background) => Container(
           padding: const EdgeInsets.all(4),
           decoration: const BoxDecoration(color: Palette.desktop, shape: BoxShape.circle),
-          child: Avatar(url: user.avatar, name: user.name, size: 108, background: background),
+          child: ProfileTap(
+            userId: user.id,
+            handle: user.handle,
+            name: user.name,
+            child: Avatar(url: user.avatar, name: user.name, size: 108, background: background),
+          ),
         );
     Widget spark(double size, Color color, {Duration delay = Duration.zero}) => PopIn(
           delay: delay,

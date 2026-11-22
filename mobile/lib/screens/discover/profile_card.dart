@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../models/user.dart';
+import '../people/people_ui.dart';
 import '../../ui/ui.dart';
 import '../../util/labels.dart';
 
@@ -81,11 +82,11 @@ class ProfileCard extends StatelessWidget {
                           color: accent,
                           border: Border.all(color: Palette.window, width: 4),
                         ),
-                        child: Avatar(
-                          url: person.avatar,
+                        child: ProfileTap(
+                          userId: person.id,
+                          handle: person.handle,
                           name: person.name,
-                          size: 74,
-                          background: accent,
+                          child: Avatar(url: person.avatar, name: person.name, size: 74, background: accent),
                         ),
                       ),
                     ),

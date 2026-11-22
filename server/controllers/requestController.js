@@ -79,9 +79,12 @@ export async function searchUsers(req, res) {
   res.json({ count: results.length, results });
 }
 
-// GET /api/users/handle/:handle — someone's profile from their link, for a signed-in student.
+// GET /api/users/handle/:handle — someone's profile from their link (or their id,
+// from a post or chat), for a signed-in student.
 export async function getByHandle(req, res) {
-  const user = await User.findOne({ handle: String(req.params.handle).toLowerCase(), isAdmin: false });
+  const key = String(req.params.handle);
+  const found = mongoose.isValidObjectId(key) ? await User.findById(key) : await User.findOne({ handle: key.toLowerCase() });
+  const user = found && !found.isAdmin ? found : null;
   if (!user) throw new HttpError(404, 'No one has that link');
   const [person] = await present(req.user, [user]);
   res.json({ user: person, isMe: user._id.equals(req.user._id) });
