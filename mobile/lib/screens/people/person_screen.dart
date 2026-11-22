@@ -65,6 +65,9 @@ class _PersonViewState extends State<PersonView> {
     _load();
   }
 
+  /// Their handle once loaded; until then whatever opened the page (a handle or an id).
+  String get _key => _person?.handle ?? widget.handle;
+
   Future<void> _load() async {
     try {
       final found = await context.api.personByHandle(widget.handle);
@@ -109,7 +112,7 @@ class _PersonViewState extends State<PersonView> {
   }
 
   Future<void> _copy() async {
-    await Clipboard.setData(ClipboardData(text: profileLink(widget.handle)));
+    await Clipboard.setData(ClipboardData(text: profileLink(_key)));
     setState(() => _copied = true);
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) setState(() => _copied = false);
@@ -138,7 +141,7 @@ class _PersonViewState extends State<PersonView> {
             children: [
               _Cover(
                 onBack: widget.onBack,
-                onShare: () => SharePlus.instance.share(ShareParams(text: '${p.name} on CrewMatch: ${profileLink(widget.handle)}')),
+                onShare: () => SharePlus.instance.share(ShareParams(text: '${p.name} on CrewMatch: ${profileLink(_key)}')),
               ),
               Transform.translate(
                 offset: const Offset(0, -48),
@@ -173,7 +176,7 @@ class _PersonViewState extends State<PersonView> {
                         Wrap(spacing: 8, runSpacing: 8, children: [for (final s in p.skills) Chip(label: Text(s))]),
                       ],
                       const SizedBox(height: 10),
-                      _LinkRow(link: profileLink(widget.handle), copied: _copied, onCopy: _copy),
+                      _LinkRow(link: profileLink(_key), copied: _copied, onCopy: _copy),
                     ],
                   ),
                 ),
@@ -324,7 +327,7 @@ class _FitCard extends StatelessWidget {
               spacing: 8,
               children: [
                 Text('${person.score}%', style: AppType.title(size: 30)),
-                Text('fit with your crew', style: AppType.body(size: 14, color: Palette.muted)),
+                Flexible(child: Text('fit with your crew', style: AppType.body(size: 14, color: Palette.muted))),
               ],
             ),
             for (final tag in person.tags)

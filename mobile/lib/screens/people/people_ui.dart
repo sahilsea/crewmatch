@@ -8,6 +8,7 @@ import '../../models/user.dart';
 import '../../state/session.dart';
 import '../../ui/ui.dart';
 import '../../util/labels.dart';
+import 'person_screen.dart';
 
 /// Someone's profile link: `https://crewmatch10.netlify.app/u/tara-fernandes`.
 /// In the browser it uses the page's own address.
@@ -191,5 +192,26 @@ class _FitPill extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
         decoration: const BoxDecoration(color: Palette.gold, borderRadius: Frame.tagRadius),
         child: Text('$score%', style: AppType.body(size: 11, weight: FontWeight.w700, color: Palette.onGold)),
+      );
+}
+
+/// Makes a profile photo (or name) open that person's profile.
+class ProfileTap extends StatelessWidget {
+  const ProfileTap({super.key, required this.userId, required this.name, required this.child, this.handle});
+
+  final String userId;
+  final String? handle;
+  final String name;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        button: true,
+        label: "Open $name's profile",
+        child: InkResponse(
+          onTap: () => Navigator.of(context).push(PersonScreen.route(handle ?? userId)),
+          radius: 32,
+          child: child,
+        ),
       );
 }

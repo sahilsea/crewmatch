@@ -822,6 +822,8 @@ describe('finding people: handles, search and team-up requests', () => {
     assert.equal(seeded.body.user.name, 'Tara Fernandes');
     const viaApp = await api('GET', '/users/handle/tara-fernandes', { token: a.token });
     assert.equal(typeof viaApp.body.user.score, 'number');
+    const byId = await api('GET', `/users/handle/${viaApp.body.user.id}`, { token: a.token });
+    assert.equal(byId.body.user.handle, 'tara-fernandes');
   });
 
   test('search by skill or name, best fit first, never yourself', async () => {

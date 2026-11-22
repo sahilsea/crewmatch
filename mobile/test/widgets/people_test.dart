@@ -98,4 +98,25 @@ void main() {
     expect(find.text('Aarav Sharma'), findsNothing);
     expect(find.text('No new requests'), findsOneWidget);
   });
+
+  testWidgets('tapping someone\'s photo opens their profile', (tester) async {
+    final session = Session(
+      api: fakeApi({
+        'GET /users/handle/u2': (_) => (200, {
+              'user': {...cardJson('u2', 'Tara Fernandes', score: 92), 'handle': 'tara-fernandes', 'relation': null},
+              'isMe': false,
+            }),
+      }),
+      tokens: MemoryTokenStore(),
+    );
+    await _pump(
+      tester,
+      session,
+      const Scaffold(body: Center(child: ProfileTap(userId: 'u2', name: 'Tara Fernandes', child: SizedBox.square(dimension: 48)))),
+    );
+    await tester.tap(find.bySemanticsLabel("Open Tara Fernandes's profile"));
+    await tester.pumpAndSettle();
+    expect(find.text('Tara Fernandes'), findsOneWidget);
+    expect(find.text('Request to team up'), findsOneWidget);
+  });
 }

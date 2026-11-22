@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../models/crew.dart';
 import '../../models/user.dart';
+import '../people/people_ui.dart';
 import '../../ui/ui.dart';
 import '../../util/labels.dart';
 
@@ -144,7 +145,12 @@ class _MemberRow extends StatelessWidget {
       child: Row(
         spacing: 14,
         children: [
-          Avatar(url: member.avatar, name: member.name, size: 44, background: isMe ? Palette.gold : Palette.pink),
+          ProfileTap(
+            userId: member.id,
+            handle: member.handle,
+            name: member.name,
+            child: Avatar(url: member.avatar, name: member.name, size: 44, background: isMe ? Palette.gold : Palette.pink),
+          ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

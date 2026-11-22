@@ -15,6 +15,7 @@ import '../../models/crew.dart';
 import '../../models/post.dart';
 import '../../state/chat_read.dart';
 import '../../state/session.dart';
+import '../people/people_ui.dart';
 import '../../ui/ui.dart';
 import '../../util/when.dart';
 
@@ -847,12 +848,14 @@ class _Bubble extends StatelessWidget {
       children: [
         Visibility.maintain(
           visible: showFace,
-          child: Avatar(
-            url: author?.avatar ?? '',
-            name: author?.name ?? '',
-            size: 28,
-            background: Palette.pink,
-          ),
+          child: switch (author) {
+            final a? => ProfileTap(
+                userId: a.id,
+                name: a.name,
+                child: Avatar(url: a.avatar, name: a.name, size: 28, background: Palette.pink),
+              ),
+            null => const SizedBox.square(dimension: 28),
+          },
         ),
         Flexible(child: column),
       ],
