@@ -114,5 +114,5 @@ String messageOf(Object error) =>
 void showNotice(BuildContext context, String message) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(message.toUpperCase())));
+    ..showSnackBar(SnackBar(content: Text(message)));
 }

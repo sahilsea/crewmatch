@@ -9,7 +9,6 @@ import '../../ui/ui.dart';
 import '../../util/labels.dart';
 import '../shell/app_tab.dart';
 import '../matches/person_activity.dart';
-import '../profile/card_editor_screen.dart';
 import 'match_dialog.dart';
 import 'swipe_stack.dart';
 
@@ -105,43 +104,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           children: [
             ScreenHeader(
               title: 'Discover',
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Your own card, one tap away.
-                  Tooltip(
-                    message: 'Edit your card',
-                    child: InkResponse(
-                      onTap: () =>
-                          Navigator.of(context).push(CardEditorScreen.route()),
-                      radius: 26,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(
-                          color: Palette.gold,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Avatar(
-                          url: SessionScope.watch(context).user?.avatar ?? '',
-                          name: SessionScope.watch(context).user?.name ?? '',
-                          size: 36,
-                          background: Palette.pink,
-                        ),
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'How ranking works',
-                    onPressed: () => showNotice(
-                      context,
-                      'Ranked on complementary skills (50%), work style (30%) and shared interests (20%).',
-                    ),
-                    style: IconButton.styleFrom(
-                      minimumSize: const Size(48, 48),
-                    ),
-                    icon: const Icon(Icons.tune_rounded, color: Palette.muted),
-                  ),
-                ],
+              trailing: IconButton(
+                tooltip: 'How ranking works',
+                onPressed: () => showRankingSheet(context),
+                style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+                icon: const Icon(Icons.info_outline_rounded, color: Palette.muted),
               ),
             ),
             Expanded(
@@ -382,3 +349,44 @@ class _FitPanel extends StatelessWidget {
     );
   }
 }
+
+/// Why people are in this order: the three parts of the fit score.
+Future<void> showRankingSheet(BuildContext context) => showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: 18,
+            children: [
+              Text('How we rank', style: AppType.title(size: 22)),
+              for (final (i, (label, share, hint)) in const [
+                ('Complementary skills', 50, 'They cover what your crew is missing'),
+                ('Work style', 30, 'Same schedule, commitment and way of talking'),
+                ('Shared interests', 20, 'You care about the same problems'),
+              ].indexed)
+                Rise(
+                  delay: Motion.stagger(i),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    spacing: 6,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(child: Text(label, style: AppType.body(size: 15, weight: FontWeight.w500))),
+                          Text('$share%', style: AppType.body(size: 15, weight: FontWeight.w700)),
+                        ],
+                      ),
+                      ThinProgressBar(value: share / 50),
+                      Text(hint, style: AppType.body(size: 13, color: Palette.muted)),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );

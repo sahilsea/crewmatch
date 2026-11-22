@@ -59,7 +59,7 @@ void main() {
     // Full crew: Add explains instead of failing.
     await tester.tap(find.text('Add'));
     await tester.pump();
-    expect(find.textContaining('YOUR CREW IS FULL'), findsOneWidget);
+    expect(find.textContaining('Your crew is full'), findsOneWidget);
     await tester.pumpAndSettle(const Duration(seconds: 5));
 
     await tester.tap(find.text('✓ Added').at(1));

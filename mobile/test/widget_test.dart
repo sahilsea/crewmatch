@@ -74,6 +74,36 @@ void main() {
     expect(find.bySemanticsLabel('Like'), findsOneWidget);
   });
 
+  testWidgets('switching tabs keeps them loaded; tapping the open tab refreshes it', (tester) async {
+    var deckLoads = 0;
+    final session = Session(
+      api: fakeApi({
+        'GET /auth/me': (_) => (200, {'user': userJson()}),
+        'GET /deck': (_) {
+          deckLoads++;
+          return (200, {'scoredAgainst': 'you', 'count': 1, 'deck': [cardJson('u2', 'Tara Fernandes', score: 92)]});
+        },
+        'GET /matches': (_) => (200, {'matches': <Object>[]}),
+        'GET /crews/mine': (_) => (200, {'crew': null}),
+      }),
+      tokens: MemoryTokenStore('jwt'),
+    );
+    await pumpApp(tester, session);
+    expect(find.text('Tara Fernandes'), findsOneWidget);
+    expect(deckLoads, 1);
+
+    await tester.tap(find.bySemanticsLabel(RegExp('^Matches')).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel(RegExp('^Discover')).last);
+    await tester.pumpAndSettle();
+    expect(deckLoads, 1, reason: 'coming back to Discover reuses the loaded deck');
+    expect(find.text('Tara Fernandes'), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel(RegExp('^Discover')).last);
+    await tester.pumpAndSettle();
+    expect(deckLoads, 2, reason: 'tapping the open tab reloads it');
+  });
+
   testWidgets('sign-in shows the API field errors under the inputs', (tester) async {
     final session = Session(
       api: fakeApi({
