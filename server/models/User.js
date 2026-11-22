@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
-import { OPTIONS, MAX_SUPERPOWERS } from '../config/options.js';
+import {
+  OPTIONS, MAX_SUPERPOWERS, CARD_COVERS, CARD_ACCENTS, CARD_FIELDS, DEFAULT_CARD_FIELDS,
+} from '../config/options.js';
 
 const { Schema } = mongoose;
 const ref = { type: Schema.Types.ObjectId, ref: 'User' };
@@ -12,6 +14,13 @@ const userSchema = new Schema(
     password: { type: String, required: true, minlength: 6, select: false },
     avatar: { type: String, default: '' },
     bio: { type: String, default: '', maxlength: 280 },
+
+    // The swipe card: a headline over a cover, and which details it shows.
+    headline: { type: String, default: '', trim: true, maxlength: 80 },
+    cover: { type: String, enum: CARD_COVERS, default: 'dusk' },
+    coverPhoto: { type: Schema.Types.ObjectId, ref: 'Photo', default: null },
+    accent: { type: String, enum: CARD_ACCENTS, default: 'crimson' },
+    cardFields: { type: [{ type: String, enum: CARD_FIELDS }], default: () => [...DEFAULT_CARD_FIELDS] },
 
     // Profile chips. Empty until the user fills the profile form.
     role: { type: String, enum: OPTIONS.role },
@@ -31,6 +40,13 @@ const userSchema = new Schema(
     swipedLeft: [ref],
     matches: [ref],
     crew: { type: Schema.Types.ObjectId, ref: 'Crew', default: null },
+
+    // Email verification: a 6-digit code, stored hashed, valid for 15 minutes.
+    emailVerified: { type: Boolean, default: false },
+    verifyCodeHash: { type: String, default: null, select: false },
+    verifyCodeExpires: { type: Date, default: null, select: false },
+    verifyCodeSentAt: { type: Date, default: null, select: false },
+    verifyAttempts: { type: Number, default: 0, select: false },
 
     isAdmin: { type: Boolean, default: false },
     // Seed users only: they like you back, so the demo always produces matches.
@@ -52,12 +68,13 @@ userSchema.methods.checkPassword = function (plain) {
 // Fields anyone can see on a swipe card.
 const PUBLIC_FIELDS = [
   'name', 'avatar', 'bio', 'role', 'experienceLevel', 'schedule', 'commitment',
-  'communication', 'interests', 'superpowers', 'skills',
+  'communication', 'interests', 'superpowers', 'skills', 'headline', 'cover', 'accent', 'cardFields',
 ];
 
 userSchema.methods.toPublic = function () {
   const out = { id: this._id.toString() };
   for (const f of PUBLIC_FIELDS) out[f] = this[f];
+  out.coverUrl = this.coverPhoto ? `/api/photos/${this.coverPhoto}` : null;
   return out;
 };
 
@@ -68,6 +85,7 @@ userSchema.methods.toSelf = function () {
     email: this.email,
     profileComplete: this.profileComplete,
     crewId: this.crew ? this.crew.toString() : null,
+    emailVerified: this.emailVerified,
     isAdmin: this.isAdmin,
     matchCount: this.matches.length,
   };

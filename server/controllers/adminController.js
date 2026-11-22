@@ -1,10 +1,13 @@
 import User from '../models/User.js';
 import Crew from '../models/Crew.js';
+import Event from '../models/Event.js';
 
 // GET /api/admin/stats — numbers for the web dashboard.
 export async function getStats(req, res) {
   const students = { isAdmin: false };
-  const [totalUsers, completeProfiles, matchAgg, crews, byRole, byInterest] = await Promise.all([
+  const [
+    totalUsers, completeProfiles, matchAgg, crews, byRole, byInterest, events, challenges, pendingAgg,
+  ] = await Promise.all([
     User.countDocuments(students),
     User.countDocuments({ ...students, profileComplete: true }),
     User.aggregate([{ $match: students }, { $group: { _id: null, n: { $sum: { $size: '$matches' } } } }]),
@@ -20,6 +23,15 @@ export async function getStats(req, res) {
       { $group: { _id: '$interests', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
     ]),
+    Event.countDocuments({ kind: 'event' }),
+    Event.countDocuments({ kind: 'challenge' }),
+    // Challenge links waiting for an admin to approve or reject.
+    Event.aggregate([
+      { $match: { 'entries.status': 'submitted' } },
+      { $unwind: '$entries' },
+      { $match: { 'entries.status': 'submitted' } },
+      { $count: 'n' },
+    ]),
   ]);
 
   res.json({
@@ -30,6 +42,9 @@ export async function getStats(req, res) {
     crews,
     byRole: byRole.map((r) => ({ role: r._id, count: r.count })),
     byInterest: byInterest.map((r) => ({ interest: r._id, count: r.count })),
+    events,
+    challenges,
+    pendingSubmissions: pendingAgg[0]?.n ?? 0,
   });
 }
 

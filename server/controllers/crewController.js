@@ -3,11 +3,15 @@ import Crew from '../models/Crew.js';
 import { crewChecklist } from '../utils/matching.js';
 import { MAX_CREW_SIZE } from '../config/options.js';
 import { HttpError } from '../middleware/error.js';
+import { rankCrews } from '../utils/leaderboard.js';
 import { leaveCrewById } from './userController.js';
+import { postSystemMessage } from './chatController.js';
 
 async function crewResponse(crewId) {
-  const crew = await Crew.findById(crewId).populate('members');
+  const [crew, ranking] = await Promise.all([Crew.findById(crewId).populate('members'), rankCrews()]);
   if (!crew) return null;
+  // Same numbers as the leaderboard.
+  const standing = ranking.find((c) => c.id === crew.id);
   return {
     id: crew.id,
     name: crew.name,
@@ -16,6 +20,8 @@ async function crewResponse(crewId) {
     checklist: crewChecklist(crew.members),
     ideas: crew.ideas,
     spotsLeft: MAX_CREW_SIZE - crew.members.length,
+    points: standing?.points ?? 0,
+    rank: standing?.rank ?? null,
   };
 }
 
@@ -59,7 +65,23 @@ export async function addMember(req, res) {
   await checkJoinable(me, [req.body.userId]);
   crew.members.addToSet(req.body.userId);
   await crew.save();
-  await User.updateOne({ _id: req.body.userId }, { crew: crew._id });
+  const added = await User.findByIdAndUpdate(req.body.userId, { crew: crew._id }, { projection: 'name' });
+  await postSystemMessage(crew._id, `${me.name} added ${added?.name ?? 'a new member'} to the crew`);
+  res.json({ crew: await crewResponse(crew._id) });
+}
+
+// DELETE /api/crews/mine/members/:userId — take someone else out of your crew.
+// To go yourself, leave the crew. The last other member can't be removed,
+// since that would dissolve the crew: leave it instead.
+export async function removeMember(req, res) {
+  const me = req.user;
+  if (!me.crew) throw new HttpError(404, 'You are not in a crew');
+  if (me._id.equals(req.params.userId)) throw new HttpError(400, 'To remove yourself, leave the crew');
+  const crew = await Crew.findById(me.crew);
+  if (!crew.members.some((m) => m.equals(req.params.userId))) throw new HttpError(404, 'Not in your crew');
+  if (crew.members.length <= 2) throw new HttpError(409, 'A crew needs two people. Leave the crew instead');
+
+  await leaveCrewById(crew._id, req.params.userId);
   res.json({ crew: await crewResponse(crew._id) });
 }
 
