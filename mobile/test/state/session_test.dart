@@ -20,6 +20,26 @@ void main() {
     expect(session.api.client.token, 'saved');
   });
 
+  test('continue with Google sends the ID token and keeps the session', () async {
+    final tokens = MemoryTokenStore();
+    final sent = <String>[];
+    final session = Session(
+      api: fakeApi({
+        'POST /auth/google': (req) {
+          sent.add(req.body);
+          return (201, {'token': 'g-token', 'user': {...userJson(), 'emailVerified': true}, 'created': true});
+        },
+      }),
+      tokens: tokens,
+    );
+
+    await session.signInWithGoogle('google-id-token');
+
+    expect(sent.single, '{"idToken":"google-id-token"}');
+    expect(session.user!.emailVerified, isTrue);
+    expect(await tokens.read(), 'g-token');
+  });
+
   test('forgets a token the API rejects', () async {
     final tokens = MemoryTokenStore('stale');
     final session = Session(

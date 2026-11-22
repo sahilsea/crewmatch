@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The app's cream, behind the logo on the icon and the launch screen. -->
+    <color name="ic_launcher_background">#F7EEDC</color>
+    <color name="splash_background">#F7EEDC</color>
+</resources>

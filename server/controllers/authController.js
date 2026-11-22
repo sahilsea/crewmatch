@@ -1,9 +1,11 @@
+import { randomBytes } from 'node:crypto';
 import User from '../models/User.js';
 import { signToken } from '../middleware/auth.js';
 import { HttpError } from '../middleware/error.js';
 import {
-  issueCode, checkCode, resendWait, checkLock, recordFailure, clearFailures,
+  issueCode, checkCode, emailCodesRequired, resendWait, checkLock, recordFailure, clearFailures,
 } from '../utils/verification.js';
+import { verifyGoogleToken } from '../utils/google.js';
 
 const avatarFor = (name) => `https://api.dicebear.com/9.x/notionists/png?seed=${encodeURIComponent(name)}`;
 
@@ -12,9 +14,10 @@ export async function register(req, res) {
   const { name, email, password } = req.body;
   if (await User.exists({ email })) throw new HttpError(409, 'An account with that email already exists');
 
-  const user = await User.create({ name, email, password, avatar: avatarFor(name) });
+  const required = emailCodesRequired();
+  const user = await User.create({ name, email, password, avatar: avatarFor(name), emailVerified: !required });
   // devCode is only there when no email is set up (development, demos).
-  const devCode = await issueCode(user);
+  const devCode = required ? await issueCode(user) : null;
   res.status(201).json({ token: signToken(user), user: user.toSelf(), ...(devCode && { devCode }) });
 }
 
@@ -29,6 +32,42 @@ export async function login(req, res) {
   }
   clearFailures(email);
   res.json({ token: signToken(user), user: user.toSelf() });
+}
+
+// POST /api/auth/google  { idToken } — "Continue with Google". Signs in, links
+// Google to an existing account with the same email, or creates a new one.
+// Google has already checked the email, so it counts as verified.
+export async function googleSignIn(req, res) {
+  let profile;
+  try {
+    profile = await verifyGoogleToken(req.body.idToken);
+  } catch {
+    throw new HttpError(401, 'Google sign-in failed. Please try again.');
+  }
+  if (!profile?.sub || !profile.email || profile.email_verified !== true) {
+    throw new HttpError(401, "Your Google account's email isn't verified");
+  }
+  const email = profile.email.toLowerCase();
+  let user = await User.findOne({ $or: [{ googleId: profile.sub }, { email }] });
+  const created = !user;
+  if (created) {
+    const name = (profile.name || email.split('@')[0]).trim().slice(0, 60);
+    user = await User.create({
+      name,
+      email,
+      // Never used: these accounts sign in with Google.
+      password: randomBytes(24).toString('hex'),
+      googleId: profile.sub,
+      emailVerified: true,
+      avatar: profile.picture || avatarFor(name),
+    });
+  } else {
+    if (!user.googleId) user.googleId = profile.sub;
+    user.emailVerified = true;
+    await user.save();
+  }
+  clearFailures(email);
+  res.status(created ? 201 : 200).json({ token: signToken(user), user: user.toSelf(), created });
 }
 
 const withCode = (id) => User.findById(id).select('+verifyCodeHash +verifyCodeExpires +verifyCodeSentAt +verifyAttempts');

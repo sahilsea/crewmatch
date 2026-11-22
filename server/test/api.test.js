@@ -15,6 +15,7 @@ const { connectDB, disconnectDB } = await import('../config/db.js');
 const { default: Crew } = await import('../models/Crew.js');
 const { default: Event } = await import('../models/Event.js');
 const { MAX_CREW_SIZE, CHECKIN_CODE_CHARS } = await import('../config/options.js');
+const { setGoogleVerifier } = await import('../utils/google.js');
 
 // 127.0.0.1 so a port already taken fails loudly instead of reaching another server.
 const PORT = Number(process.env.TEST_PORT) || 5083;
@@ -73,8 +74,8 @@ async function newUser({ profile = PROFILE } = {}) {
     body: { name: `Tester ${(userCount + 26).toString(26).replace(/\d/g, (d) => 'abcdefghij'[d]).toUpperCase()}`, email: `tester${userCount}@test.dev`, password: 'secret123' },
   });
   assert.equal(status, 201);
-  // No email is set up in tests, so the code comes back in the response.
-  assert.equal((await api('POST', '/auth/verify', { token: body.token, body: { code: body.devCode } })).status, 200);
+  // Email codes are off by default; when a test turns them on, the code comes back in the response.
+  if (body.devCode) assert.equal((await api('POST', '/auth/verify', { token: body.token, body: { code: body.devCode } })).status, 200);
   if (profile) await api('PUT', '/users/me', { token: body.token, body: profile });
   return { token: body.token, id: body.user.id };
 }
@@ -756,6 +757,48 @@ describe('student-hosted events', () => {
   });
 });
 
+describe('continue with Google', () => {
+  // Fake tokens: "ok|<sub>|<email>|<name>"; anything else fails like a bad signature.
+  before(() => setGoogleVerifier(async (token) => {
+    const [kind, sub, email, name, verified = 'yes'] = token.split('|');
+    if (kind !== 'ok') throw new Error('bad token');
+    return { sub, email, name, email_verified: verified === 'yes', picture: 'https://example.com/me.png' };
+  }));
+  const google = (idToken) => api('POST', '/auth/google', { body: { idToken } });
+  const tok = (...parts) => ['ok', ...parts].join('|').padEnd(24, ' ');
+
+  test('a new person gets a verified account, and signs in again with the same Google id', async () => {
+    const first = await google(tok('g-100', 'Nova.Rao@Gmail.com', 'Nova Rao'));
+    assert.equal(first.status, 201, JSON.stringify(first.body));
+    assert.deepEqual(
+      [first.body.created, first.body.user.email, first.body.user.name, first.body.user.emailVerified, first.body.user.profileComplete],
+      [true, 'nova.rao@gmail.com', 'Nova Rao', true, false]
+    );
+    // Verified straight away: past the email check, on to the profile.
+    assert.equal((await api('GET', '/matches', { token: first.body.token })).status, 200);
+
+    const again = await google(tok('g-100', 'nova.rao@gmail.com', 'Nova Rao'));
+    assert.deepEqual([again.status, again.body.created, again.body.user.id], [200, false, first.body.user.id]);
+  });
+
+  test('links Google to an existing password account with the same email and verifies it', async () => {
+    process.env.REQUIRE_EMAIL_VERIFICATION = 'true';
+    const reg = await api('POST', '/auth/register', { body: { name: 'Link Me', email: 'link.me@test.dev', password: 'secret123' } });
+    delete process.env.REQUIRE_EMAIL_VERIFICATION;
+    assert.equal(reg.body.user.emailVerified, false);
+    const res = await google(tok('g-200', 'link.me@test.dev', 'Link Me'));
+    assert.deepEqual([res.status, res.body.user.id, res.body.user.emailVerified], [200, reg.body.user.id, true]);
+    // The password still works too.
+    assert.equal((await api('POST', '/auth/login', { body: { email: 'link.me@test.dev', password: 'secret123' } })).status, 200);
+  });
+
+  test('bad tokens and unverified Google emails are refused', async () => {
+    assert.deepEqual([(await google('x'.repeat(40))).status], [401]);
+    assert.equal((await google(tok('g-300', 'nope@test.dev', 'No', 'no'))).status, 401);
+    assert.equal((await google('short')).status, 400);
+  });
+});
+
 describe('CORS', () => {
   const allowOrigin = async (origin) =>
     (await api('GET', '/health', { headers: { origin } })).headers.get('access-control-allow-origin');
@@ -980,6 +1023,18 @@ describe('chat attachments', () => {
 });
 
 describe('sign-up checks and email verification', () => {
+  // These run with email codes switched on (REQUIRE_EMAIL_VERIFICATION=true).
+  before(() => { process.env.REQUIRE_EMAIL_VERIFICATION = 'true'; });
+  after(() => { delete process.env.REQUIRE_EMAIL_VERIFICATION; });
+
+  test('with codes off (the default), a new email account can use the app straight away', async () => {
+    delete process.env.REQUIRE_EMAIL_VERIFICATION;
+    const reg = await api('POST', '/auth/register', { body: { name: 'No Code', email: 'no.code@test.dev', password: 'secret123' } });
+    process.env.REQUIRE_EMAIL_VERIFICATION = 'true';
+    assert.equal(reg.status, 201);
+    assert.deepEqual([reg.body.user.emailVerified, reg.body.devCode], [true, undefined]);
+  });
+
   test('weak passwords, bad names and bad emails are refused with a reason', async () => {
     const cases = [
       [{ name: 'Ana Gomez', email: 'ana@test.dev', password: 'short1' }, 'password', 'Use at least 8 characters'],

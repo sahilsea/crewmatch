@@ -142,12 +142,7 @@ class _AdminRail extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 20),
         child: Column(
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: const BoxDecoration(color: Palette.navy, borderRadius: Frame.buttonRadius),
-              child: const Icon(Icons.verified_user_outlined, color: Palette.cream),
-            ),
+            const BrandMark(size: 44),
             const SizedBox(height: 30),
             for (final tab in AdminTab.values)
               Padding(

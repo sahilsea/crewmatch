@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import { HttpError } from './error.js';
+import { emailCodesRequired } from '../utils/verification.js';
 
 export function signToken(user) {
   return jwt.sign({ sub: user._id.toString() }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -32,7 +33,7 @@ export function adminOnly(req, res, next) {
 
 // Everything except signing in, verifying and leaving needs a verified email.
 export function verifiedRequired(req, res, next) {
-  if (!req.user.emailVerified && !req.user.isAdmin) throw new HttpError(403, 'Verify your email first');
+  if (emailCodesRequired() && !req.user.emailVerified && !req.user.isAdmin) throw new HttpError(403, 'Verify your email first');
   next();
 }
 

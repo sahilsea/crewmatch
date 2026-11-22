@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import {
   OPTIONS, MAX_SUPERPOWERS, CARD_COVERS, CARD_ACCENTS, CARD_FIELDS, DEFAULT_CARD_FIELDS,
 } from '../config/options.js';
+import { emailCodesRequired } from '../utils/verification.js';
 
 const { Schema } = mongoose;
 const ref = { type: Schema.Types.ObjectId, ref: 'User' };
@@ -12,6 +13,9 @@ const userSchema = new Schema(
     name: { type: String, required: true, trim: true, maxlength: 60 },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true, minlength: 6, select: false },
+    // Google's id for this person, once they've used "Continue with Google".
+    // Left unset otherwise, so the sparse unique index skips them.
+    googleId: { type: String, unique: true, sparse: true },
     avatar: { type: String, default: '' },
     bio: { type: String, default: '', maxlength: 280 },
 
@@ -85,7 +89,8 @@ userSchema.methods.toSelf = function () {
     email: this.email,
     profileComplete: this.profileComplete,
     crewId: this.crew ? this.crew.toString() : null,
-    emailVerified: this.emailVerified,
+    // With email codes off, nobody is held at the verify screen.
+    emailVerified: this.emailVerified || !emailCodesRequired(),
     isAdmin: this.isAdmin,
     matchCount: this.matches.length,
   };

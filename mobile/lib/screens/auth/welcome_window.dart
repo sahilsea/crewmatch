@@ -106,7 +106,7 @@ class WideWelcome extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: const BoxDecoration(color: _cream, borderRadius: Frame.buttonRadius),
-              child: const Center(child: GlyphIcon(Glyph.logo, size: 24, color: Color(0xFF7A1C1C))),
+              child: const Center(child: BrandMark(size: 32, style: MarkStyle.brand)),
             ),
             Text('CrewMatch', style: AppType.title(size: 24, color: _cream)),
           ],

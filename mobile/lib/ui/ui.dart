@@ -3,6 +3,7 @@ library;
 
 export 'avatar.dart';
 export 'badges.dart';
+export 'brand_mark.dart';
 export 'controls.dart';
 export 'copy_text.dart';
 export 'dashed.dart';

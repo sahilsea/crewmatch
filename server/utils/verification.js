@@ -3,6 +3,10 @@ import bcrypt from 'bcryptjs';
 import { HttpError } from '../middleware/error.js';
 import { sendMail, canSendEmail } from './mailer.js';
 
+// Email codes are off unless REQUIRE_EMAIL_VERIFICATION=true (turn it on once
+// an email service is connected). Google sign-in is verified by Google either way.
+export const emailCodesRequired = () => process.env.REQUIRE_EMAIL_VERIFICATION === 'true';
+
 export const CODE_TTL_MINUTES = 15;
 export const RESEND_AFTER_SECONDS = 30;
 export const MAX_CODE_ATTEMPTS = 5;
