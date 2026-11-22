@@ -358,6 +358,22 @@ async function seedFeed(crewIds) {
   }))));
 }
 
+// Events students host themselves: two waiting for points, one community only.
+const STUDENT_EVENTS = [
+  ['Aarav Sharma', { kind: 'event', category: 'workshop', title: 'Flutter Study Jam', summary: 'Build a to-do app together, beginners welcome.',
+    location: 'Library, Room 2', startsAt: dayAt(1, 18), endsAt: dayAt(1, 20), capacity: 10, askedPoints: 30, status: 'pending' }],
+  ['Zoya Khan', { kind: 'event', category: 'talk', title: 'Design Critique Circle', summary: 'Bring a screen, get honest feedback.',
+    location: 'Studio B', startsAt: dayAt(2, 17), endsAt: dayAt(2, 18, 30), capacity: 8, askedPoints: 20, status: 'pending' }],
+  ['Yash Agarwal', { kind: 'event', category: 'social', title: 'Chai and Code', summary: 'Casual pairing over chai. Bring a bug.',
+    location: 'Canteen', startsAt: dayAt(1, 16), endsAt: dayAt(1, 17), status: 'community' }],
+];
+
+async function seedStudentEvents() {
+  const hosts = await User.find({ name: { $in: STUDENT_EVENTS.map(([n]) => n) } }, 'name');
+  const idOf = Object.fromEntries(hosts.map((u) => [u.name, u._id]));
+  return Event.create(STUDENT_EVENTS.map(([name, e]) => ({ ...e, points: 0, createdBy: idOf[name] })));
+}
+
 export async function seedDatabase() {
   await Promise.all([User.deleteMany({}), Crew.deleteMany({}), Event.deleteMany({}), Post.deleteMany({}), Message.deleteMany({})]);
 
@@ -373,6 +389,7 @@ export async function seedDatabase() {
 
   const crewIds = await seedCrews();
   const events = await seedEvents(crewIds);
+  const hosted = await seedStudentEvents();
   await seedFeed(crewIds);
   await seedCards();
 
@@ -383,6 +400,7 @@ export async function seedDatabase() {
   for (const e of events.filter((ev) => ev.kind === 'event')) {
     console.log(`  ${e.checkinCode}  ${e.title} (${e.state})`);
   }
+  console.log(`Plus ${hosted.length} student-hosted events (${hosted.filter((e) => e.status === 'pending').length} waiting for review).`);
 }
 
 // `node seed/seed.js` runs it against MONGO_URI.

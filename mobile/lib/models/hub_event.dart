@@ -10,6 +10,36 @@ enum EventState { upcoming, live, ended }
 /// challenge link waiting for review; `completed` means points were awarded.
 enum EntryStatus { joined, submitted, completed }
 
+/// `official` events come from organisers. Students host `community` events
+/// (no points), or `pending` ones that asked organisers for points.
+enum EventStatus { official, community, pending }
+
+/// Who hosts a student event.
+class EventHost {
+  const EventHost({required this.id, required this.name});
+
+  final String id;
+  final String name;
+}
+
+/// A crew's entry as organisers see it (`GET /admin/events`).
+class AdminEntry {
+  const AdminEntry({required this.crewId, required this.crewName, required this.entry});
+
+  factory AdminEntry.fromJson(Map<String, dynamic> json) {
+    final crew = json['crew'] as Map<String, dynamic>? ?? const {};
+    return AdminEntry(
+      crewId: crew['id'] as String? ?? '',
+      crewName: crew['name'] as String? ?? '',
+      entry: EventEntry.fromJson(json),
+    );
+  }
+
+  final String crewId;
+  final String crewName;
+  final EventEntry entry;
+}
+
 /// The signed-in user's crew entry on an event or challenge.
 class EventEntry {
   const EventEntry({
@@ -62,10 +92,17 @@ class HubEvent {
     this.crewCount = 0,
     this.state = EventState.upcoming,
     this.myEntry,
+    this.status = EventStatus.official,
+    this.askedPoints = 0,
+    this.host,
+    this.hosting = false,
+    this.checkinCode,
+    this.entries = const [],
   });
 
   factory HubEvent.fromJson(Map<String, dynamic> json) {
     final entry = json['myEntry'];
+    final host = json['host'];
     return HubEvent(
       id: json['id'] as String,
       kind: enumByName(EventKind.values, json['kind'], EventKind.event),
@@ -81,6 +118,14 @@ class HubEvent {
       crewCount: intOr(json['crewCount']),
       state: enumByName(EventState.values, json['state'], EventState.upcoming),
       myEntry: entry is Map<String, dynamic> ? EventEntry.fromJson(entry) : null,
+      status: enumByName(EventStatus.values, json['status'], EventStatus.official),
+      askedPoints: intOr(json['askedPoints']),
+      host: host is Map<String, dynamic>
+          ? EventHost(id: host['id'] as String? ?? '', name: host['name'] as String? ?? '')
+          : null,
+      hosting: json['hosting'] == true,
+      checkinCode: json['checkinCode'] as String?,
+      entries: [for (final e in objectList(json['entries'])) AdminEntry.fromJson(e)],
     );
   }
 
@@ -110,6 +155,23 @@ class HubEvent {
   final int crewCount;
   final EventState state;
   final EventEntry? myEntry;
+  final EventStatus status;
+
+  /// Points a student host asked organisers for.
+  final int askedPoints;
+  final EventHost? host;
+
+  /// The signed-in student hosts this event.
+  final bool hosting;
+
+  /// Only for organisers and the event's own host.
+  final String? checkinCode;
+
+  /// Every crew's entry. Organisers only.
+  final List<AdminEntry> entries;
+
+  bool get isOfficial => status == EventStatus.official;
+  bool get isPending => status == EventStatus.pending;
 
   bool get isChallenge => kind == EventKind.challenge;
   bool get isFull => capacity != null && crewCount >= capacity!;

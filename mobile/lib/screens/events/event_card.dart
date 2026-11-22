@@ -143,6 +143,7 @@ class _EventCardState extends State<EventCard> {
               ),
             ],
           ),
+          if (e.hosting || e.host != null) _HostLine(event: e),
           if (_expanded) ...[
             if (e.summary.isNotEmpty) Text(e.summary, style: AppType.body(size: 14.5)),
             if (e.details.isNotEmpty) Text(e.details, style: AppType.body(size: 14, color: Palette.muted)),
@@ -152,7 +153,12 @@ class _EventCardState extends State<EventCard> {
           if (status case (final text, final detail, final color)) _StatusLine(status: text, detail: detail, color: color),
           Row(
             children: [
-              InfoTag('+${e.points} pts', icon: Icons.bolt_rounded),
+              if (e.isOfficial)
+                InfoTag('+${e.points} pts', icon: Icons.bolt_rounded)
+              else if (e.isPending)
+                InfoTag('+${e.askedPoints} pending', icon: Icons.schedule_rounded, color: Palette.high, textColor: Palette.ink)
+              else
+                const InfoTag('Community', color: Palette.high, textColor: Palette.ink),
               const SizedBox(width: 6),
               TextButton(
                 onPressed: () => setState(() => _expanded = !_expanded),
@@ -301,3 +307,37 @@ class _StatusLine extends StatelessWidget {
 }
 
 String _capitalized(String text) => text.isEmpty ? text : '${text[0].toUpperCase()}${text.substring(1)}';
+
+/// Who hosts a student event. The host also sees the check-in code to show at the venue.
+class _HostLine extends StatelessWidget {
+  const _HostLine({required this.event});
+
+  final HubEvent event;
+
+  @override
+  Widget build(BuildContext context) {
+    final code = event.checkinCode;
+    final text = event.hosting ? 'You host this' : 'Hosted by ${event.host!.name}';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: const BoxDecoration(color: Palette.strip, borderRadius: Frame.chipRadius),
+      child: Row(
+        spacing: 8,
+        children: [
+          const Icon(Icons.person_outline_rounded, size: 18, color: Palette.muted),
+          Expanded(child: Text(text, style: AppType.body(size: 14, weight: FontWeight.w500))),
+          if (event.hosting && code != null)
+            Semantics(
+              label: 'Check-in code ${code.split('').join(' ')}',
+              excludeSemantics: true,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: const BoxDecoration(color: Palette.navy, borderRadius: Frame.tagRadius),
+                child: Text(code, style: AppType.title(size: 16, color: Palette.cream)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}

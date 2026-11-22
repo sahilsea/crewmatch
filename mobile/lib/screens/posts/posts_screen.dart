@@ -446,7 +446,7 @@ class _EventTile extends StatelessWidget {
                   textColor: Palette.cream,
                 ),
               const Spacer(),
-              InfoTag('+${e.points}'),
+              e.isOfficial ? InfoTag('+${e.points}') : const InfoTag('Community', color: Palette.high, textColor: Palette.ink),
             ],
           ),
           const SizedBox(height: 10),

@@ -1,6 +1,7 @@
 import '../models/auth_result.dart';
 import '../models/crew.dart';
 import '../models/deck.dart';
+import '../models/admin_stats.dart';
 import '../models/hub_event.dart';
 import '../models/json.dart';
 import '../models/leaderboard.dart';
@@ -137,6 +138,42 @@ class CrewMatchApi {
           'url': url,
           if (note != null && note.isNotEmpty) 'note': note,
         }),
+      );
+
+  /// Hosts a student event. `askPoints > 0` sends it to organisers for review.
+  Future<HubEvent> hostEvent(Map<String, Object?> fields) async => _event(await client.post('/events', fields));
+
+  Future<void> cancelHostedEvent(String id) async {
+    await client.delete('/events/$id');
+  }
+
+  // Organisers
+
+  Future<AdminStats> adminStats() async => AdminStats.fromJson(await client.get('/admin/stats'));
+
+  Future<List<HubEvent>> adminEvents() async => HubEvent.listFrom((await client.get('/admin/events'))['events']);
+
+  Future<HubEvent> createEvent(Map<String, Object?> fields) async => _event(await client.post('/admin/events', fields));
+
+  Future<HubEvent> updateEvent(String id, Map<String, Object?> fields) async =>
+      _event(await client.patch('/admin/events/$id', fields));
+
+  Future<void> deleteEvent(String id) async {
+    await client.delete('/admin/events/$id');
+  }
+
+  /// Approves a student's event; it starts awarding [points].
+  Future<HubEvent> makeOfficial(String id, {int? points}) async =>
+      _event(await client.post('/admin/events/$id/official', {'points': ?points}));
+
+  /// Keeps a student's event up, without points.
+  Future<HubEvent> keepCommunity(String id) async => _event(await client.post('/admin/events/$id/community'));
+
+  Future<HubEvent> approveEntry(String eventId, String crewId, {int? points}) async =>
+      _event(await client.post('/admin/events/$eventId/entries/$crewId/approve', {'points': ?points}));
+
+  Future<HubEvent> rejectEntry(String eventId, String crewId, {String? note}) async => _event(
+        await client.post('/admin/events/$eventId/entries/$crewId/reject', {if (note != null && note.isNotEmpty) 'note': note}),
       );
 
   /// The live leaderboard, or another hackathon's with [hackathonId].

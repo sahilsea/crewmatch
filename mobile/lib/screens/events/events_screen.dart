@@ -8,6 +8,7 @@ import '../../ui/ui.dart';
 import '../../util/parallel.dart';
 import '../shell/app_tab.dart';
 import 'check_in_dialog.dart';
+import 'create_event_screen.dart';
 import 'event_card.dart';
 import 'submit_dialog.dart';
 
@@ -131,6 +132,13 @@ class _EventsScreenState extends State<EventsScreen> {
     showNotice(context, 'Sent for review');
   }
 
+  Future<void> _create() async {
+    final made = await Navigator.of(context).push(CreateEventScreen.route());
+    if (!mounted) return;
+    if (made != null) setState(() => _kind = made.kind);
+    _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final events = _events;
@@ -152,6 +160,14 @@ class _EventsScreenState extends State<EventsScreen> {
                   icon: const Icon(Icons.arrow_back_rounded, color: Palette.ink),
                 ),
           subtitle: live > 0 ? '$live live now' : null,
+          trailing: Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilledButton.icon(
+              onPressed: _create,
+              icon: const Icon(Icons.add_rounded, size: 20),
+              label: const Text('Create'),
+            ),
+          ),
         ),
         Expanded(
           child: events == null

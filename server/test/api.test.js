@@ -209,8 +209,9 @@ describe('seed data', () => {
 
   test('6 events (1 ended, 2 live, 3 upcoming) and 5 challenges (1 ended, 4 open)', async () => {
     const count = (list, state) => list.filter((e) => e.state === state).length;
-    const events = (await api('GET', '/events?kind=event', { token: web })).body.events;
-    const challenges = (await api('GET', '/events?kind=challenge', { token: web })).body.events;
+    const official = (list) => list.filter((e) => e.status === 'official');
+    const events = official((await api('GET', '/events?kind=event', { token: web })).body.events);
+    const challenges = official((await api('GET', '/events?kind=challenge', { token: web })).body.events);
     assert.equal(events.length, 6);
     assert.deepEqual([count(events, 'ended'), count(events, 'live'), count(events, 'upcoming')], [1, 2, 3]);
     assert.equal(challenges.length, 5);
@@ -221,7 +222,7 @@ describe('seed data', () => {
   test('every seeded event has a check-in code, challenges none', async () => {
     const { events } = (await api('GET', '/admin/events', { token: admin })).body;
     for (const e of events) {
-      if (e.kind === 'event') assert.match(e.checkinCode, /^[A-Z2-9]{4}$/);
+      if (e.kind === 'event') assert.match(e.checkinCode, /^[A-Z2-9]{4}$/, e.title);
       else assert.equal(e.checkinCode, null);
     }
   });
@@ -256,6 +257,7 @@ describe('seed data', () => {
     assert.equal(stats.events, 6);
     assert.equal(stats.challenges, 5);
     assert.ok(stats.pendingSubmissions >= 2);
+    assert.deepEqual([stats.pendingEvents, stats.communityEvents], [2, 1]);
   });
 });
 
@@ -639,7 +641,7 @@ describe('events and challenges', () => {
     assert.equal(after.challenges, before.challenges + 1);
     assert.equal(after.events, before.events + 1);
     assert.equal(after.pendingSubmissions, before.pendingSubmissions + 1);
-    assert.equal(after.events + after.challenges, await Event.countDocuments());
+    assert.equal(after.events + after.challenges, await Event.countDocuments({ status: 'official' }));
   });
 
   test('a crew that dissolves leaves its entries behind safely', async () => {
@@ -671,6 +673,86 @@ describe('events and challenges', () => {
     assert.equal((await api('PATCH', `/admin/events/${ghost.id}`, { token: admin, body: { points: 10 } })).status, 200);
     assert.ok(!(await api('GET', '/leaderboard', { token: a.a.token })).body.crews.some((c) => c.id === echo.id));
     assert.equal((await api('GET', '/admin/stats', { token: admin })).status, 200);
+  });
+});
+
+describe('student-hosted events', () => {
+  const hosted = (fields = {}) => ({
+    kind: 'event', title: 'Study jam', summary: 'Made by a student', category: 'workshop',
+    startsAt: minutesFromNow(-10), endsAt: minutesFromNow(90), ...fields,
+  });
+
+  test('community right away, the host sees the code, others do not', async () => {
+    const crew = await newCrew('Host Crew');
+    const res = await api('POST', '/events', { token: crew.a.token, body: hosted({ points: 999 }) });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    const { event } = res.body;
+    assert.deepEqual([event.status, event.points, event.hosting, event.host.id], ['community', 0, true, crew.a.id]);
+    assert.match(event.checkinCode, /^[A-Z2-9]{4}$/);
+
+    const other = await newUser();
+    const seen = await getEvent(event.id, other.token);
+    assert.deepEqual([seen.hosting, seen.checkinCode, seen.host.id], [false, undefined, crew.a.id]);
+
+    // Checking in at a community event earns no points.
+    const visitor = await newCrew('Visitors');
+    const checked = await api('POST', `/events/${event.id}/checkin`, { token: visitor.a.token, body: { code: event.checkinCode } });
+    assert.deepEqual([checked.status, checked.body.pointsAwarded], [200, 0]);
+  });
+
+  test('asking for points waits for an organiser, who approves and back-fills', async () => {
+    const host = await newUser();
+    const { body } = await api('POST', '/events', { token: host.token, body: hosted({ askPoints: 30 }) });
+    assert.deepEqual([body.event.status, body.event.askedPoints, body.event.points], ['pending', 30, 0]);
+
+    const crew = await newCrew('Early Birds');
+    const code = (await adminEvent(body.event.id)).checkinCode;
+    await api('POST', `/events/${body.event.id}/checkin`, { token: crew.a.token, body: { code } });
+
+    const approved = await api('POST', `/admin/events/${body.event.id}/official`, { token: admin, body: { points: 40 } });
+    assert.equal(approved.status, 200);
+    assert.deepEqual([approved.body.event.status, approved.body.event.points], ['official', 40]);
+    assert.equal(approved.body.event.entries[0].pointsAwarded, 40);
+    assert.equal((await api('POST', `/admin/events/${body.event.id}/official`, { token: admin, body: {} })).status, 409);
+  });
+
+  test('keep as community, or reject by deleting', async () => {
+    const host = await newUser();
+    const one = (await api('POST', '/events', { token: host.token, body: hosted({ askPoints: 20 }) })).body.event;
+    const kept = await api('POST', `/admin/events/${one.id}/community`, { token: admin });
+    assert.deepEqual([kept.status, kept.body.event.status, kept.body.event.points], [200, 'community', 0]);
+
+    const two = (await api('POST', '/events', { token: host.token, body: hosted({ askPoints: 20 }) })).body.event;
+    assert.equal((await api('DELETE', `/admin/events/${two.id}`, { token: admin })).status, 204);
+    assert.equal((await api('GET', `/events/${two.id}`, { token: host.token })).status, 404);
+  });
+
+  test('validation, a limit of 3 at a time, and only the host can remove one', async () => {
+    const host = await newUser();
+    const post = (body) => api('POST', '/events', { token: host.token, body });
+    assert.equal((await post(hosted({ askPoints: 101 }))).status, 400);
+    assert.equal((await post(hosted({ category: 'build' }))).status, 400);
+    assert.equal((await post(hosted({ startsAt: minutesFromNow(-120), endsAt: minutesFromNow(-60) }))).status, 400);
+
+    const made = [];
+    for (let i = 0; i < 3; i++) made.push((await post(hosted({ title: `Jam ${i}` }))).body.event);
+    const fourth = await post(hosted());
+    assert.deepEqual([fourth.status, fourth.body.error], [409, 'You can host up to 3 events at a time']);
+
+    const stranger = await newUser();
+    assert.equal((await api('DELETE', `/events/${made[0].id}`, { token: stranger.token })).status, 403);
+    assert.equal((await api('DELETE', `/events/${made[0].id}`, { token: host.token })).status, 204);
+    assert.equal((await post(hosted())).status, 201);
+  });
+
+  test('members cannot approve; official events cannot be removed by students', async () => {
+    const host = await newUser();
+    const mine = (await api('POST', '/events', { token: host.token, body: hosted({ askPoints: 10 }) })).body.event;
+    for (const path of [`/admin/events/${mine.id}/official`, `/admin/events/${mine.id}/community`]) {
+      assert.equal((await api('POST', path, { token: host.token, body: {} })).status, 403);
+    }
+    const official = await createEvent();
+    assert.equal((await api('DELETE', `/events/${official.id}`, { token: host.token })).status, 403);
   });
 });
 

@@ -7,6 +7,7 @@ export async function getStats(req, res) {
   const students = { isAdmin: false };
   const [
     totalUsers, completeProfiles, matchAgg, crews, byRole, byInterest, events, challenges, pendingAgg,
+    pendingEvents, communityEvents, liveEvents,
   ] = await Promise.all([
     User.countDocuments(students),
     User.countDocuments({ ...students, profileComplete: true }),
@@ -23,8 +24,8 @@ export async function getStats(req, res) {
       { $group: { _id: '$interests', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
     ]),
-    Event.countDocuments({ kind: 'event' }),
-    Event.countDocuments({ kind: 'challenge' }),
+    Event.countDocuments({ kind: 'event', status: 'official' }),
+    Event.countDocuments({ kind: 'challenge', status: 'official' }),
     // Challenge links waiting for an admin to approve or reject.
     Event.aggregate([
       { $match: { 'entries.status': 'submitted' } },
@@ -32,6 +33,10 @@ export async function getStats(req, res) {
       { $match: { 'entries.status': 'submitted' } },
       { $count: 'n' },
     ]),
+    // Students' events: waiting for points, and running without points.
+    Event.countDocuments({ status: 'pending' }),
+    Event.countDocuments({ status: 'community' }),
+    Event.countDocuments({ startsAt: { $lte: new Date() }, endsAt: { $gte: new Date() } }),
   ]);
 
   res.json({
@@ -45,6 +50,9 @@ export async function getStats(req, res) {
     events,
     challenges,
     pendingSubmissions: pendingAgg[0]?.n ?? 0,
+    pendingEvents,
+    communityEvents,
+    liveEvents,
   });
 }
 
