@@ -19,12 +19,7 @@ class SideRail extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 20),
         child: Column(
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: const BoxDecoration(color: Palette.crimson, borderRadius: Frame.buttonRadius),
-              child: const Center(child: GlyphIcon(Glyph.logo, size: 24, color: Palette.onCrimson)),
-            ),
+            const BrandMark(size: 44),
             const SizedBox(height: 30),
             for (final tab in AppTab.values)
               Padding(

@@ -20,17 +20,7 @@ class TopMenuBar extends StatelessWidget {
     color: Palette.desktop,
     child: Row(
       children: [
-        Container(
-          width: 34,
-          height: 34,
-          decoration: const BoxDecoration(
-            color: Palette.crimson,
-            borderRadius: Frame.buttonRadius,
-          ),
-          child: const Center(
-            child: GlyphIcon(Glyph.logo, size: 20, color: Palette.onCrimson),
-          ),
-        ),
+        const BrandMark(size: 34),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
