@@ -19,6 +19,9 @@ app.use(helmet());
 // Browsers are limited to CLIENT_URLS. Requests with no Origin (the Flutter app, curl) pass through.
 app.use(cors({
   origin: (origin, cb) => cb(null, !origin || allowed.includes(origin) || (localDev && LOCALHOST.test(origin))),
+  // Browsers check permission (OPTIONS) before each call; let them remember it
+  // for 2 hours (Chrome's maximum) instead of asking every time.
+  maxAge: 7200,
 }));
 // Posts may carry a photo as a data URL; everything else stays small.
 app.use('/api/posts', express.json({ limit: '5mb' }));

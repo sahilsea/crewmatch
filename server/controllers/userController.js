@@ -1,4 +1,5 @@
 import User from '../models/User.js';
+import TeamRequest from '../models/TeamRequest.js';
 import Crew from '../models/Crew.js';
 import Event from '../models/Event.js';
 import Post from '../models/Post.js';
@@ -129,6 +130,7 @@ export async function getUser(req, res) {
 export async function deleteAccount(req, res) {
   const id = req.user._id;
   await User.updateMany({}, { $pull: { swipedRight: id, swipedLeft: id, matches: id } });
+  await TeamRequest.deleteMany({ $or: [{ from: id }, { to: id }] });
   if (req.user.crew) await leaveCrewById(req.user.crew, id);
   // Their posts, photos, likes and comments go too. Chat lines stay, unsigned.
   await Promise.all([

@@ -16,6 +16,8 @@ const userSchema = new Schema(
     // Google's id for this person, once they've used "Continue with Google".
     // Left unset otherwise, so the sparse unique index skips them.
     googleId: { type: String, unique: true, sparse: true },
+    // The short name in their profile link: crewmatch…/u/tara-fernandes.
+    handle: { type: String, unique: true, sparse: true, lowercase: true, trim: true },
     avatar: { type: String, default: '' },
     bio: { type: String, default: '', maxlength: 280 },
 
@@ -60,6 +62,7 @@ const userSchema = new Schema(
 );
 
 userSchema.pre('save', async function () {
+  if (!this.handle && this.name) this.handle = await this.constructor.freeHandle(this.name, this._id);
   if (this.isModified('password')) {
     this.password = await bcrypt.hash(this.password, 10);
   }
@@ -72,8 +75,31 @@ userSchema.methods.checkPassword = function (plain) {
 // Fields anyone can see on a swipe card.
 const PUBLIC_FIELDS = [
   'name', 'avatar', 'bio', 'role', 'experienceLevel', 'schedule', 'commitment',
-  'communication', 'interests', 'superpowers', 'skills', 'headline', 'cover', 'accent', 'cardFields',
+  'communication', 'interests', 'superpowers', 'skills', 'headline', 'cover', 'accent', 'cardFields', 'handle',
 ];
+
+// "Tara Fernandes" -> "tara-fernandes". Letters and digits only, dashes between words.
+export const slugify = (name) =>
+  name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30) || 'student';
+
+// Picks a free handle: the name, then name-2, name-3…
+userSchema.statics.freeHandle = async function (name, selfId = null) {
+  const base = slugify(name);
+  for (let n = 1; ; n++) {
+    const handle = n === 1 ? base : `${base}-${n}`;
+    const taken = await this.exists({ handle, ...(selfId && { _id: { $ne: selfId } }) });
+    if (!taken) return handle;
+  }
+};
+
+// Gives a handle to everyone who has none (accounts from before handles existed).
+userSchema.statics.backfillHandles = async function () {
+  const missing = await this.find({ handle: { $in: [null, undefined] } }, 'name');
+  for (const u of missing) {
+    await this.updateOne({ _id: u._id }, { $set: { handle: await this.freeHandle(u.name, u._id) } });
+  }
+  return missing.length;
+};
 
 userSchema.methods.toPublic = function () {
   const out = { id: this._id.toString() };

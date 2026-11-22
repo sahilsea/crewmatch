@@ -799,6 +799,106 @@ describe('continue with Google', () => {
   });
 });
 
+describe('finding people: handles, search and team-up requests', () => {
+  const register = async (name, email) => {
+    const { body } = await api('POST', '/auth/register', { body: { name, email, password: 'secret123' } });
+    await api('PUT', '/users/me', { token: body.token, body: PROFILE });
+    return { token: body.token, id: body.user.id, handle: body.user.handle };
+  };
+  const send = (from, to, extra = {}) => api('POST', '/requests', { token: from.token, body: { to: to.id, ...extra } });
+
+  test('everyone gets a unique handle, and the public link works without signing in', async () => {
+    const a = await register('Handle Twin', 'twin.one@test.dev');
+    const b = await register('Handle Twin', 'twin.two@test.dev');
+    assert.deepEqual([a.handle, b.handle], ['handle-twin', 'handle-twin-2']);
+
+    const pub = await api('GET', '/public/u/handle-twin');
+    assert.equal(pub.status, 200);
+    assert.equal(pub.body.user.name, 'Handle Twin');
+    assert.equal(pub.body.user.email, undefined);
+    assert.equal((await api('GET', '/public/u/nobody-here')).status, 404);
+
+    const seeded = await api('GET', '/public/u/tara-fernandes');
+    assert.equal(seeded.body.user.name, 'Tara Fernandes');
+    const viaApp = await api('GET', '/users/handle/tara-fernandes', { token: a.token });
+    assert.equal(typeof viaApp.body.user.score, 'number');
+  });
+
+  test('search by skill or name, best fit first, never yourself', async () => {
+    const me = await register('Search Person', 'search.person@test.dev');
+    const byName = await api('GET', `/users/search?q=${encodeURIComponent('Tara')}`, { token: me.token });
+    assert.ok(byName.body.results.some((u) => u.name === 'Tara Fernandes'));
+    const all = (await api('GET', '/users/search', { token: me.token })).body.results;
+    assert.ok(all.every((u) => u.id !== me.id));
+    for (let i = 1; i < all.length; i++) assert.ok(all[i - 1].score >= all[i].score);
+    const free = (await api('GET', '/users/search?free=1', { token: me.token })).body.results;
+    assert.ok(free.length > 0 && free.every((u) => u.crewName === null));
+    assert.equal((await api('GET', '/users/search?q=%5B(', { token: me.token })).status, 200);
+  });
+
+  test('send, see it in their Requests with the note, accept, and you are matched', async () => {
+    const a = await register('Req Sender', 'req.sender@test.dev');
+    const b = await register('Req Receiver', 'req.receiver@test.dev');
+    const sent = await send(a, b, { note: 'Want to build together?', source: 'qr' });
+    assert.equal(sent.status, 201, JSON.stringify(sent.body));
+    assert.equal((await send(a, b)).status, 409);
+    assert.equal((await send(a, a)).status, 400);
+
+    const theirs = (await api('GET', '/requests', { token: b.token })).body;
+    assert.equal(theirs.incoming.length, 1);
+    assert.deepEqual([theirs.incoming[0].note, theirs.incoming[0].source, theirs.incoming[0].user.id], ['Want to build together?', 'qr', a.id]);
+    assert.equal((await api('GET', '/requests', { token: a.token })).body.sent[0].user.relation, 'sent');
+
+    const accepted = await api('POST', `/requests/${theirs.incoming[0].id}/accept`, { token: b.token });
+    assert.deepEqual([accepted.status, accepted.body.match], [200, true]);
+    const matches = (await api('GET', '/matches', { token: a.token })).body.matches;
+    assert.ok(matches.some((m) => m.id === b.id));
+    assert.equal((await send(a, b)).body.error, "You're already matched");
+  });
+
+  test('asking someone who already asked you makes the match straight away', async () => {
+    const a = await register('Mutual Ask', 'mutual.a@test.dev');
+    const b = await register('Mutual Bee', 'mutual.b@test.dev');
+    await send(a, b);
+    const back = await send(b, a);
+    assert.deepEqual([back.status, back.body.match], [200, true]);
+  });
+
+  test('decline is final for that sender; withdraw lets you ask again', async () => {
+    const a = await register('Decline Me', 'decline.a@test.dev');
+    const b = await register('Decline You', 'decline.b@test.dev');
+    await send(a, b);
+    const id = (await api('GET', '/requests', { token: b.token })).body.incoming[0].id;
+    assert.equal((await api('POST', `/requests/${id}/decline`, { token: b.token })).status, 200);
+    assert.equal((await api('POST', `/requests/${id}/accept`, { token: b.token })).status, 409);
+    assert.equal((await send(a, b)).status, 409);
+    assert.equal((await api('GET', '/requests', { token: a.token })).body.sent.length, 0);
+
+    const c = await register('Withdraw Me', 'withdraw.c@test.dev');
+    await send(a, c);
+    const mine = (await api('GET', '/requests', { token: a.token })).body.sent[0].id;
+    assert.equal((await api('DELETE', `/requests/${mine}`, { token: c.token })).status, 404);
+    assert.equal((await api('DELETE', `/requests/${mine}`, { token: a.token })).status, 204);
+    assert.equal((await send(a, c)).status, 201);
+  });
+
+  test('a right swipe in Discover shows up in their Requests', async () => {
+    const a = await register('Swipe Asker', 'swipe.a@test.dev');
+    const b = await register('Swipe Target', 'swipe.b@test.dev');
+    await api('POST', '/swipe', { token: a.token, body: { targetId: b.id, direction: 'right' } });
+    const inc = (await api('GET', '/requests', { token: b.token })).body.incoming;
+    assert.deepEqual([inc.length, inc[0].source], [1, 'discover']);
+  });
+
+  test(`at most 20 requests a day`, async () => {
+    const a = await register('Busy Asker', 'busy.asker@test.dev');
+    const targets = (await api('GET', '/users/search', { token: a.token })).body.results.filter((u) => !u.relation).slice(0, 21);
+    assert.equal(targets.length, 21);
+    for (const t of targets.slice(0, 20)) assert.equal((await send(a, t)).status, 201);
+    assert.equal((await send(a, targets[20])).status, 429);
+  });
+});
+
 describe('CORS', () => {
   const allowOrigin = async (origin) =>
     (await api('GET', '/health', { headers: { origin } })).headers.get('access-control-allow-origin');

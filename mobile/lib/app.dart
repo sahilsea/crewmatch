@@ -1,6 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 
 import 'screens/admin/admin_shell.dart';
+import 'screens/people/public_profile_screen.dart';
+import 'state/incoming_link.dart';
 import 'screens/auth/sign_in_screen.dart';
 import 'screens/auth/verify_email_screen.dart';
 import 'screens/profile/profile_screen.dart';
@@ -98,7 +100,15 @@ class _RootGate extends StatelessWidget {
     final session = SessionScope.watch(context);
     final user = session.user;
     if (session.restoring) return const Scaffold(body: LoadingView(message: 'Starting up…'));
-    if (user == null) return const SignInScreen();
+    if (user == null) {
+      // Opened from someone's profile link: show their card before sign-in.
+      return ValueListenableBuilder<bool>(
+        valueListenable: IncomingLink.showPublic,
+        builder: (context, showPublic, _) => showPublic && IncomingLink.handle != null
+            ? PublicProfileScreen(handle: IncomingLink.handle!)
+            : const SignInScreen(),
+      );
+    }
     if (user.isAdmin) return const AdminShell();
     if (!user.emailVerified) return const VerifyEmailScreen();
     if (!user.profileComplete) return const ProfileScreen(firstTime: true);

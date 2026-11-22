@@ -130,7 +130,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _fetchNew() async {
     final current = _messages;
-    if (current == null) return;
+    // Kept alive on a hidden tab: wait until it's on screen again.
+    if (current == null || !TickerMode.valuesOf(context).enabled) return;
     try {
       final after = current.isEmpty ? null : current.last.createdAt;
       final newer = await context.api.messages(after: after);

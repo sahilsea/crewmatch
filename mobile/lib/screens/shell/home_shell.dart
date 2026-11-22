@@ -1,3 +1,6 @@
+import '../../models/team_request.dart';
+import '../../state/incoming_link.dart';
+import '../people/person_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../crew/crew_screen.dart';
@@ -13,8 +16,10 @@ import 'top_menu_bar.dart';
 
 /// The signed-in app: menu bar on top, the current tab, the dock below.
 ///
-/// Each visit builds the tab afresh, so it always shows current data
-/// (a crew formed on the web shows up as soon as you open Crew).
+/// Each tab is built the first time you open it and then kept, so switching
+/// back is instant and keeps your place. A tab loads fresh when you tap it
+/// while it's open, or when another screen sends you there (e.g. "Form a
+/// crew" opens Crew with the new crew in it).
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
@@ -27,23 +32,59 @@ class _HomeShellState extends State<HomeShell> {
   static var _lastTab = AppTab.discover;
   var _tab = _lastTab;
 
-  /// Bumped on every dock tap, so tapping the open tab reloads it.
-  var _visit = 0;
+  /// Tabs opened so far; the others aren't built until you visit them.
+  late final _opened = <AppTab>{_tab};
 
-  void _open(AppTab tab) => setState(() {
+  @override
+  void initState() {
+    super.initState();
+    // Opened from a profile link: show that person once you're in.
+    final handle = IncomingLink.take();
+    if (handle != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.of(context).push(PersonScreen.route(handle, source: RequestSource.link));
+      });
+    }
+  }
+
+  /// Bumped to rebuild one tab from scratch.
+  final _generation = {for (final tab in AppTab.values) tab: 0};
+
+  /// The dock or rail: switch, or reload the tab that's already open.
+  void _select(AppTab tab) => setState(() {
+        if (tab == _tab) _generation[tab] = _generation[tab]! + 1;
         _tab = _lastTab = tab;
-        _visit++;
+        _opened.add(tab);
       });
 
-  Widget _screen(bool wide) => KeyedSubtree(
-        key: ValueKey((_tab, _visit, wide)),
-        child: switch (_tab) {
-          AppTab.discover => DiscoverScreen(onOpen: _open, wide: wide),
-          AppTab.matches => MatchesScreen(onOpen: _open, wide: wide),
-          AppTab.crew => CrewScreen(onOpen: _open, wide: wide),
-          AppTab.posts => PostsScreen(onOpen: _open, wide: wide),
-          AppTab.ranks => LeaderboardScreen(onOpen: _open, wide: wide),
-        },
+  /// Another screen sending you here: show it with current data.
+  void _open(AppTab tab) => setState(() {
+        if (_opened.contains(tab)) _generation[tab] = _generation[tab]! + 1;
+        _tab = _lastTab = tab;
+        _opened.add(tab);
+      });
+
+  Widget _build(AppTab tab, bool wide) => switch (tab) {
+        AppTab.discover => DiscoverScreen(onOpen: _open, wide: wide),
+        AppTab.matches => MatchesScreen(onOpen: _open, wide: wide),
+        AppTab.crew => CrewScreen(onOpen: _open, wide: wide),
+        AppTab.posts => PostsScreen(onOpen: _open, wide: wide),
+        AppTab.ranks => LeaderboardScreen(onOpen: _open, wide: wide),
+      };
+
+  /// Every opened tab stays alive; only the current one shows and animates.
+  Widget _screen(bool wide) => IndexedStack(
+        index: _tab.index,
+        sizing: StackFit.expand,
+        children: [
+          for (final tab in AppTab.values)
+            _opened.contains(tab)
+                ? TickerMode(
+                    enabled: tab == _tab,
+                    child: KeyedSubtree(key: ValueKey((tab, _generation[tab], wide)), child: _build(tab, wide)),
+                  )
+                : const SizedBox.shrink(),
+        ],
       );
 
   @override
@@ -56,7 +97,7 @@ class _HomeShellState extends State<HomeShell> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SideRail(selected: _tab, onSelected: _open),
+              SideRail(selected: _tab, onSelected: _select),
               // On very wide monitors the content stays a balanced width,
               // centred, instead of stretching into long empty lines.
               Expanded(
@@ -85,7 +126,7 @@ class _HomeShellState extends State<HomeShell> {
           ],
         ),
       ),
-      bottomNavigationBar: Dock(selected: _tab, onSelected: _open),
+      bottomNavigationBar: Dock(selected: _tab, onSelected: _select),
     );
   }
 }
