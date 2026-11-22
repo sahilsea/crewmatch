@@ -120,9 +120,12 @@ class AccountMenu extends StatelessWidget {
       itemBuilder: (context) {
         final mode = Appearance.instance.value;
         return [
-          const PopupMenuItem(value: _AccountAction.card, child: Text('Your card')),
-          const PopupMenuItem(value: _AccountAction.profile, child: Text('Profile')),
-          const PopupMenuDivider(),
+          // Organisers have no student card or profile.
+          if (user?.isAdmin != true) ...[
+            const PopupMenuItem(value: _AccountAction.card, child: Text('Your card')),
+            const PopupMenuItem(value: _AccountAction.profile, child: Text('Profile')),
+            const PopupMenuDivider(),
+          ],
           CheckedPopupMenuItem(value: _AccountAction.light, checked: mode == ThemeMode.light, child: const Text('Light')),
           CheckedPopupMenuItem(value: _AccountAction.dark, checked: mode == ThemeMode.dark, child: const Text('Dark')),
           CheckedPopupMenuItem(value: _AccountAction.system, checked: mode == ThemeMode.system, child: const Text('Match phone')),

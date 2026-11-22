@@ -63,6 +63,8 @@ Both kinds are stored in one `Event` model with `kind: "event" | "challenge"`.
 | DELETE | `/events/:id/join` | | `{ event }` (only while `myEntry.status` is `joined`) |
 | POST | `/events/:id/checkin` | `{ code }` | `{ event, pointsAwarded }` (events only) |
 | POST | `/events/:id/submit` | `{ url, note? }` | `{ event }` (challenges only) |
+| POST | `/events` | StudentEventInput | `201 { event }` (host your own event) |
+| DELETE | `/events/:id` | | `204` (the host only, never an official event) |
 | GET | `/leaderboard` | | see below |
 
 List order: `live` first, then `upcoming` by `startsAt`, then `ended` with the most recent first.
@@ -77,6 +79,16 @@ Rules and errors:
 - Submit: `url` must be an http(s) URL; `note` max 280 chars. Allowed again while not `completed` (it replaces the link). `409 "Already completed"` after approval.
 - Leave (`DELETE …/join`) after submitting or completing: `409 "You can't leave after submitting"`.
 - Any crew member can act for the crew.
+
+### Student-hosted events
+
+- `StudentEventInput`: `{ kind, title, summary, category, location?, startsAt, endsAt, capacity?, askPoints? (0-100) }`.
+- Every event has `status`: `official` (organisers), `community` (a student's, no points) or `pending`
+  (a student's that asked for `askedPoints`, waiting for an organiser). Only `official` events award points.
+- Student events go live straight away as `community`, or `pending` with `askPoints > 0`.
+- `host: { id, name }` names the student who made it (null for organisers' events). The host gets
+  `hosting: true` and the event's `checkinCode`, to show at their venue.
+- A student can host up to 3 events that haven't ended: `409 "You can host up to 3 events at a time"`.
 
 ## Leaderboard
 
@@ -117,6 +129,8 @@ Rules and errors:
 | POST | `/admin/events` | EventInput | `201 { event: AdminEvent }` |
 | PATCH | `/admin/events/:id` | partial EventInput | `{ event: AdminEvent }` |
 | DELETE | `/admin/events/:id` | | `204` |
+| POST | `/admin/events/:id/official` | `{ points? }` | `{ event: AdminEvent }` (approve a student's event) |
+| POST | `/admin/events/:id/community` | | `{ event: AdminEvent }` (keep it, no points) |
 | POST | `/admin/events/:id/entries/:crewId/approve` | `{ points? }` | `{ event: AdminEvent }` |
 | POST | `/admin/events/:id/entries/:crewId/reject` | `{ note? }` | `{ event: AdminEvent }` |
 
@@ -126,7 +140,10 @@ Rules and errors:
   Creating an event without `checkinCode` generates a 4-character code from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`. `endsAt` must be after `startsAt`.
 - Approve: sets `completed`, `pointsAwarded = points ?? event.points`, `completedAt = now`. Works on any entry status.
 - Reject: back to `joined`, `pointsAwarded = 0`, stores `note` so the crew sees why.
-- `GET /admin/stats` gains `events`, `challenges` and `pendingSubmissions` counts.
+- Official: `points = points ?? askedPoints`; crews that already checked in get the points too.
+  Rejecting a student's event is `DELETE /admin/events/:id`.
+- `GET /admin/stats` gains `events` and `challenges` (official only), `pendingSubmissions`,
+  `pendingEvents`, `communityEvents` and `liveEvents` counts.
 
 ## Seed data
 

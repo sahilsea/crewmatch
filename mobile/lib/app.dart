@@ -1,6 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
-import 'screens/admin/admin_notice_screen.dart';
+import 'screens/admin/admin_shell.dart';
 import 'screens/auth/sign_in_screen.dart';
 import 'screens/auth/verify_email_screen.dart';
 import 'screens/profile/profile_screen.dart';
@@ -99,7 +99,7 @@ class _RootGate extends StatelessWidget {
     final user = session.user;
     if (session.restoring) return const Scaffold(body: LoadingView(message: 'Starting up…'));
     if (user == null) return const SignInScreen();
-    if (user.isAdmin) return const AdminNoticeScreen();
+    if (user.isAdmin) return const AdminShell();
     if (!user.emailVerified) return const VerifyEmailScreen();
     if (!user.profileComplete) return const ProfileScreen(firstTime: true);
     return const HomeShell();

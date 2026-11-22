@@ -3,7 +3,7 @@ import { protect, adminOnly, profileRequired, verifiedRequired } from '../middle
 import { validate } from '../middleware/validate.js';
 import {
   registerSchema, loginSchema, profileSchema, swipeSchema, createCrewSchema, addMemberSchema,
-  eventInputSchema, checkinSchema, submitSchema, approveSchema, rejectSchema,
+  eventInputSchema, studentEventSchema, officialSchema, checkinSchema, submitSchema, approveSchema, rejectSchema,
   createPostSchema, commentSchema, messageSchema, photoUploadSchema, verifySchema,
 } from '../utils/schemas.js';
 import { register, login, me, verifyEmail, resendCode } from '../controllers/authController.js';
@@ -15,6 +15,7 @@ import { getMatches, unmatch } from '../controllers/matchController.js';
 import { createCrew, getMyCrew, addMember, removeMember, renameCrew, leaveCrew } from '../controllers/crewController.js';
 import {
   listEvents, getEvent, joinEvent, leaveEvent, checkIn, submitEntry, getLeaderboard,
+  hostEvent, cancelHostedEvent, makeOfficial, keepCommunity,
   adminListEvents, createEvent, updateEvent, deleteEvent, approveEntry, rejectEntry,
 } from '../controllers/eventController.js';
 import { getStats, listUsers } from '../controllers/adminController.js';
@@ -81,9 +82,11 @@ router.delete('/crews/mine', leaveCrew);
 
 // Hackathon hub: events, challenges and the leaderboard (docs/hackathon-api.md)
 router.get('/events', listEvents);
+router.post('/events', validate(studentEventSchema), hostEvent);
 router.get('/events/:id', getEvent);
 router.post('/events/:id/join', joinEvent);
 router.delete('/events/:id/join', leaveEvent);
+router.delete('/events/:id', cancelHostedEvent);
 router.post('/events/:id/checkin', validate(checkinSchema), checkIn);
 router.post('/events/:id/submit', validate(submitSchema), submitEntry);
 router.get('/leaderboard', getLeaderboard);
@@ -96,6 +99,8 @@ router.get('/admin/events', adminOnly, adminListEvents);
 router.post('/admin/events', adminOnly, validate(eventInputSchema), createEvent);
 router.patch('/admin/events/:id', adminOnly, validate(eventInputSchema.partial()), updateEvent);
 router.delete('/admin/events/:id', adminOnly, deleteEvent);
+router.post('/admin/events/:id/official', adminOnly, validate(officialSchema), makeOfficial);
+router.post('/admin/events/:id/community', adminOnly, keepCommunity);
 router.post('/admin/events/:id/entries/:crewId/approve', adminOnly, validate(approveSchema), approveEntry);
 router.post('/admin/events/:id/entries/:crewId/reject', adminOnly, validate(rejectSchema), rejectEntry);
 

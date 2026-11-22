@@ -26,6 +26,12 @@ export const EVENT_CATEGORIES = {
   event: ['workshop', 'talk', 'social', 'expo'],
   challenge: ['build', 'design', 'pitch', 'quiz'],
 };
+// official: set by organisers. community: made by a student, worth no points.
+// pending: a student's event waiting for an organiser to approve points.
+export const EVENT_STATUSES = ['official', 'community', 'pending'];
+export const MAX_ASK_POINTS = 100;
+// Events a student can host at once (not yet ended).
+export const MAX_HOSTED_EVENTS = 3;
 export const ENTRY_STATUSES = ['joined', 'submitted', 'completed'];
 // Generated check-in codes skip look-alikes (I/1, O/0) so they read well off a projector.
 export const CHECKIN_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';

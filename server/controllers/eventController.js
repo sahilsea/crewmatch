@@ -1,12 +1,13 @@
 import mongoose from 'mongoose';
 import Event from '../models/Event.js';
-import { EVENT_KINDS, CHECKIN_GRACE_MINUTES } from '../config/options.js';
+import { EVENT_KINDS, CHECKIN_GRACE_MINUTES, MAX_HOSTED_EVENTS } from '../config/options.js';
 import { HttpError } from '../middleware/error.js';
 import { rankCrews } from '../utils/leaderboard.js';
 import { postSystemMessage } from './chatController.js';
 
 // Crew names and sizes for every entry. A crew that has since dissolved populates to null.
-const withCrews = { path: 'entries.crew', select: 'name members' };
+// Plus the host's name for student events.
+const withCrews = [{ path: 'entries.crew', select: 'name members' }, { path: 'createdBy', select: 'name isAdmin' }];
 
 // Unknown and malformed ids are both "not found".
 async function findEvent(id) {
@@ -52,7 +53,7 @@ async function setEntry(eventId, crewId, changes, { open = false } = {}) {
 
 // The event as the signed-in user sees it, read again after a change.
 async function memberView(id, user) {
-  return (await findEvent(id)).toMember(user.crew);
+  return (await findEvent(id)).toMember(user.crew, user._id);
 }
 
 // GET /api/events?kind=event|challenge
@@ -60,7 +61,7 @@ export async function listEvents(req, res) {
   const { kind } = req.query;
   if (kind && !EVENT_KINDS.includes(kind)) throw new HttpError(400, 'kind must be "event" or "challenge"');
   const events = await Event.find(kind ? { kind } : {}).populate(withCrews);
-  res.json({ events: events.map((e) => e.toMember(req.user.crew)).sort(byListOrder) });
+  res.json({ events: events.map((e) => e.toMember(req.user.crew, req.user._id)).sort(byListOrder) });
 }
 
 // GET /api/events/:id — with the crews taking part.
@@ -72,7 +73,7 @@ export async function getEvent(req, res) {
     memberCount: e.crew.members.length,
     status: e.status,
   }));
-  res.json({ event: { ...event.toMember(req.user.crew), crews } });
+  res.json({ event: { ...event.toMember(req.user.crew, req.user._id), crews } });
 }
 
 // POST /api/events/:id/join — RSVP to an event or accept a challenge. Joining again is a no-op.
@@ -115,7 +116,8 @@ export async function checkIn(req, res) {
     event._id, crewId, { status: 'completed', pointsAwarded: event.points, completedAt: new Date() }, { open: true }
   );
   if (!checkedIn) throw new HttpError(409, 'Your crew already checked in');
-  await postSystemMessage(crewId, `${req.user.name} checked the crew in at ${event.title} · +${event.points}`);
+  const pts = event.points ? ` · +${event.points}` : '';
+  await postSystemMessage(crewId, `${req.user.name} checked the crew in at ${event.title}${pts}`);
   res.json({ event: await memberView(event._id, req.user), pointsAwarded: event.points });
 }
 
@@ -138,6 +140,35 @@ export async function submitEntry(req, res) {
   );
   if (!submitted) throw new HttpError(409, 'Already completed');
   res.json({ event: await memberView(event._id, req.user) });
+}
+
+// POST /api/events — a student hosts their own event. It's live at once as a
+// community event; asking for points sends it to the organisers (pending).
+export async function hostEvent(req, res) {
+  const { askPoints = 0, ...fields } = req.body;
+  if (fields.endsAt <= Date.now()) throw new HttpError(400, 'Pick an end time in the future');
+  const hosting = await Event.countDocuments({ createdBy: req.user._id, status: { $ne: 'official' }, endsAt: { $gt: new Date() } });
+  if (hosting >= MAX_HOSTED_EVENTS) throw new HttpError(409, `You can host up to ${MAX_HOSTED_EVENTS} events at a time`);
+  const event = await Event.create({
+    ...fields,
+    points: 0,
+    checkinCode: null,
+    status: askPoints > 0 ? 'pending' : 'community',
+    askedPoints: askPoints,
+    createdBy: req.user._id,
+  });
+  res.status(201).json({ event: await memberView(event._id, req.user) });
+}
+
+// DELETE /api/events/:id — hosts can take down their own student event.
+export async function cancelHostedEvent(req, res) {
+  const event = await findEvent(req.params.id);
+  const hostId = event.createdBy?._id ?? event.createdBy;
+  if (event.status === 'official' || !hostId?.equals(req.user._id)) {
+    throw new HttpError(403, 'Only the host can remove this');
+  }
+  await event.deleteOne();
+  res.status(204).end();
 }
 
 // GET /api/leaderboard
@@ -177,6 +208,28 @@ export async function deleteEvent(req, res) {
   const event = await findEvent(req.params.id);
   await event.deleteOne();
   res.status(204).end();
+}
+
+// POST /api/admin/events/:id/official  { points? } — approves a student's event.
+// It keeps its host and starts awarding points (the asked points unless overridden).
+export async function makeOfficial(req, res) {
+  const event = await findEvent(req.params.id);
+  if (event.status === 'official') throw new HttpError(409, 'Already official');
+  event.status = 'official';
+  event.points = req.body.points ?? event.askedPoints;
+  // Crews that already checked in earn the points now too.
+  for (const entry of event.entries) if (entry.status === 'completed') entry.pointsAwarded = event.points;
+  await event.save();
+  res.json({ event: (await findEvent(event._id)).toAdmin() });
+}
+
+// POST /api/admin/events/:id/community — keeps a student's event up without points.
+export async function keepCommunity(req, res) {
+  const event = await findEvent(req.params.id);
+  if (event.status === 'official') throw new HttpError(409, 'Official events stay official');
+  event.status = 'community';
+  await event.save();
+  res.json({ event: (await findEvent(event._id)).toAdmin() });
 }
 
 async function reviewEntry(req, res, changes) {

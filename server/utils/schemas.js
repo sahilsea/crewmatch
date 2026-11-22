@@ -2,7 +2,7 @@ import { z } from 'zod';
 import mongoose from 'mongoose';
 import {
   OPTIONS, MAX_SUPERPOWERS, MAX_CREW_SIZE, EVENT_KINDS, EVENT_CATEGORIES,
-  CARD_COVERS, CARD_ACCENTS, CARD_FIELDS,
+  CARD_COVERS, CARD_ACCENTS, CARD_FIELDS, MAX_ASK_POINTS,
 } from '../config/options.js';
 
 const objectId = z.string().refine((v) => mongoose.isValidObjectId(v), 'Invalid id');
@@ -113,6 +113,24 @@ export const eventInputSchema = z
     checkinCode: z.string().trim().max(20).nullable(),
   })
   .partial({ details: true, location: true, capacity: true, checkinCode: true });
+
+// A student's own event. It goes live as a community event straight away;
+// asking for points sends it to the organisers for review.
+export const studentEventSchema = z
+  .object({
+    kind: z.enum(EVENT_KINDS),
+    title: z.string().trim().min(2).max(80),
+    summary: z.string().trim().min(1).max(140),
+    category: z.enum(Object.values(EVENT_CATEGORIES).flat()),
+    location: z.string().trim().max(80),
+    startsAt: date,
+    endsAt: date,
+    capacity: z.number().int().min(1).max(500).nullable(),
+    askPoints: z.number().int().min(0).max(MAX_ASK_POINTS),
+  })
+  .partial({ location: true, capacity: true, askPoints: true });
+
+export const officialSchema = z.object({ points: z.number().int().min(0).max(1000).optional() });
 
 export const checkinSchema = z.object({ code: z.string().trim().max(50) });
 

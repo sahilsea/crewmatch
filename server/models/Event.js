@@ -1,6 +1,8 @@
 import { randomInt } from 'node:crypto';
 import mongoose from 'mongoose';
-import { EVENT_KINDS, EVENT_CATEGORIES, ENTRY_STATUSES, CHECKIN_CODE_CHARS } from '../config/options.js';
+import {
+  EVENT_KINDS, EVENT_CATEGORIES, EVENT_STATUSES, ENTRY_STATUSES, CHECKIN_CODE_CHARS, MAX_ASK_POINTS,
+} from '../config/options.js';
 
 const { Schema } = mongoose;
 
@@ -39,6 +41,10 @@ const eventSchema = new Schema(
     checkinCode: { type: String, default: null, trim: true, uppercase: true, maxlength: 20 },
     entries: [entrySchema],
     createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    // Organisers' events are official. Students' events start as community
+    // (no points) or pending (points asked for, waiting for an organiser).
+    status: { type: String, enum: EVENT_STATUSES, default: 'official' },
+    askedPoints: { type: Number, default: 0, min: 0, max: MAX_ASK_POINTS },
   },
   { timestamps: true }
 );
@@ -48,6 +54,7 @@ const eventSchema = new Schema(
 eventSchema.index({ kind: 1, startsAt: 1 });
 eventSchema.index({ 'entries.status': 1 });
 eventSchema.index({ 'entries.crew': 1 });
+eventSchema.index({ status: 1, createdBy: 1 });
 
 const randomCode = () =>
   Array.from({ length: 4 }, () => CHECKIN_CODE_CHARS[randomInt(CHECKIN_CODE_CHARS.length)]).join('');
@@ -58,6 +65,8 @@ eventSchema.pre('validate', function () {
   if (!this.location) this.location = this.kind === 'challenge' ? 'Anywhere' : 'TBA';
   if (this.kind === 'challenge') this.checkinCode = null;
   else if (!this.checkinCode) this.checkinCode = randomCode();
+  // Only official events award points.
+  if (this.status !== 'official') this.points = 0;
 
   const categories = EVENT_CATEGORIES[this.kind];
   if (categories && !categories.includes(this.category)) {
@@ -87,13 +96,35 @@ const PUBLIC_FIELDS = [
 const ENTRY_FIELDS = ['status', 'submissionUrl', 'note', 'pointsAwarded', 'joinedAt', 'completedAt'];
 const entryFields = (entry) => Object.fromEntries(ENTRY_FIELDS.map((f) => [f, entry[f]]));
 
-// What members see: no check-in code, and only their own crew's entry.
-eventSchema.methods.toMember = function (crewId) {
+// Who made a student event, approved or not. Populate createdBy first;
+// organisers' own events have no host.
+eventSchema.methods.host = function () {
+  const by = this.createdBy;
+  if (!by?.name || by.isAdmin) return null;
+  return { id: by._id.toString(), name: by.name };
+};
+
+const createdById = (event) => event.createdBy?._id ?? event.createdBy;
+
+// What members see: only their own crew's entry, and no check-in code unless
+// they host the event (they show it at their own venue).
+eventSchema.methods.toMember = function (crewId, userId = null) {
   const entries = this.crewEntries();
   const mine = crewId ? entries.find((e) => e.crew._id.equals(crewId)) : null;
+  const hosting = !!userId && this.status !== 'official' && !!createdById(this)?.equals(userId);
   const out = { id: this._id.toString() };
   for (const f of PUBLIC_FIELDS) out[f] = this[f];
-  return { ...out, crewCount: entries.length, state: this.state, myEntry: mine ? entryFields(mine) : null };
+  return {
+    ...out,
+    status: this.status,
+    askedPoints: this.askedPoints,
+    host: this.host(),
+    hosting,
+    ...(hosting && { checkinCode: this.kind === 'event' ? this.checkinCode : null }),
+    crewCount: entries.length,
+    state: this.state,
+    myEntry: mine ? entryFields(mine) : null,
+  };
 };
 
 // Admins also get the check-in code and every crew's entry.
