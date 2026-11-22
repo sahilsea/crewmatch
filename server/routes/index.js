@@ -4,9 +4,9 @@ import { validate } from '../middleware/validate.js';
 import {
   registerSchema, loginSchema, profileSchema, swipeSchema, createCrewSchema, addMemberSchema,
   eventInputSchema, studentEventSchema, officialSchema, checkinSchema, submitSchema, approveSchema, rejectSchema,
-  createPostSchema, commentSchema, messageSchema, photoUploadSchema, verifySchema,
+  createPostSchema, commentSchema, messageSchema, photoUploadSchema, verifySchema, googleSchema,
 } from '../utils/schemas.js';
-import { register, login, me, verifyEmail, resendCode } from '../controllers/authController.js';
+import { register, login, googleSignIn, me, verifyEmail, resendCode } from '../controllers/authController.js';
 import {
   getOptions, updateProfile, getUser, deleteAccount, uploadAvatar, removeAvatar, uploadCover, removeCover, getActivity,
 } from '../controllers/userController.js';
@@ -33,6 +33,7 @@ router.get('/health', (req, res) => res.json({ ok: true }));
 router.get('/options', getOptions);
 router.post('/auth/register', validate(registerSchema), register);
 router.post('/auth/login', validate(loginSchema), login);
+router.post('/auth/google', validate(googleSchema), googleSignIn);
 router.get('/photos/:id', getPhoto);
 
 // Everything below needs a signed-in user

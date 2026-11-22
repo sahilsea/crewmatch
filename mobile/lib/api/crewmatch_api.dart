@@ -24,6 +24,10 @@ class CrewMatchApi {
         await client.post('/auth/login', {'email': email, 'password': password}),
       );
 
+  /// "Continue with Google" with the ID token Google gave the app.
+  Future<AuthResult> googleSignIn(String idToken) async =>
+      AuthResult.fromJson(await client.post('/auth/google', {'idToken': idToken}));
+
   Future<User> verifyEmail(String code) async => _user(await client.post('/auth/verify', {'code': code}));
 
   /// Sends a fresh code. Returns it when the server has no email set up.

@@ -1,3 +1,5 @@
+import 'google_button.dart';
+
 import 'package:material_ui/material_ui.dart';
 
 import '../../api/api_exception.dart';
@@ -35,10 +37,10 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   Map<String, String> _check() => {
-        'name': ?(_registering ? Validators.name(_name.text) : null),
-        'email': ?Validators.email(_email.text),
-        'password': ?(_registering ? Validators.newPassword(_password.text) : Validators.password(_password.text)),
-      };
+    'name': ?(_registering ? Validators.name(_name.text) : null),
+    'email': ?Validators.email(_email.text),
+    'password': ?(_registering ? Validators.newPassword(_password.text) : Validators.password(_password.text)),
+  };
 
   /// Typing in a field clears its error.
   void _edited(String field) {
@@ -73,6 +75,22 @@ class _SignInScreenState extends State<SignInScreen> {
         await session.signIn(_email.text, _password.text);
       }
       // The root gate swaps this screen out once the session has a user.
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// "Continue with Google": signs in, or makes a verified account.
+  Future<void> _google(String idToken) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+      _local = const {};
+    });
+    try {
+      await context.session.signInWithGoogle(idToken);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e);
     } finally {
@@ -136,11 +154,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     error: fieldErrors['password'],
                     obscureText: true,
                     textInputAction: TextInputAction.done,
-                    autofillHints: [
-                      _registering
-                          ? AutofillHints.newPassword
-                          : AutofillHints.password,
-                    ],
+                    autofillHints: [_registering ? AutofillHints.newPassword : AutofillHints.password],
                     onChanged: (_) {
                       _edited('password');
                       if (_registering) setState(() {});
@@ -148,10 +162,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     onSubmitted: (_) => _submit(),
                   ),
                 ),
-                if (_registering) ...[
-                  PasswordStrength(password: _password.text),
-                  _PasswordRules(password: _password.text),
-                ],
+                if (_registering) ...[PasswordStrength(password: _password.text), _PasswordRules(password: _password.text)],
                 if (formError != null) ErrorNote(formError),
                 if (info != null)
                   Container(
@@ -178,6 +189,11 @@ class _SignInScreenState extends State<SignInScreen> {
                     ),
                   ),
                 ),
+                const OrDivider(),
+                Rise(
+                  delay: const Duration(milliseconds: 350),
+                  child: GoogleButton(onToken: _google, registering: _registering, busy: _busy),
+                ),
               ],
             ),
           ),
@@ -189,14 +205,8 @@ class _SignInScreenState extends State<SignInScreen> {
             alignment: WrapAlignment.center,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Text(
-                _registering ? 'Already have one?' : 'New here?',
-                style: AppType.body(size: 15, color: Palette.muted),
-              ),
-              TextButton(
-                onPressed: _toggleMode,
-                child: Text(_registering ? 'Sign in' : 'Create an account'),
-              ),
+              Text(_registering ? 'Already have one?' : 'New here?', style: AppType.body(size: 15, color: Palette.muted)),
+              TextButton(onPressed: _toggleMode, child: Text(_registering ? 'Sign in' : 'Create an account')),
             ],
           ),
         ),
@@ -285,11 +295,7 @@ class PasswordStrength extends StatelessWidget {
 
   int get score {
     if (password.isEmpty) return 0;
-    final variety = [
-      RegExp('[a-zA-Z]'),
-      RegExp(r'\d'),
-      RegExp(r'[^a-zA-Z\d]'),
-    ].where((r) => r.hasMatch(password)).length;
+    final variety = [RegExp('[a-zA-Z]'), RegExp(r'\d'), RegExp(r'[^a-zA-Z\d]')].where((r) => r.hasMatch(password)).length;
     return ((password.length >= 8 ? 2 : 1) + (variety - 1)).clamp(1, 4);
   }
 
@@ -314,29 +320,17 @@ class PasswordStrength extends StatelessWidget {
               for (var i = 0; i < 4; i++)
                 Expanded(
                   child: AnimatedContainer(
-                    duration: Motion.of(
-                      context,
-                      const Duration(milliseconds: 300),
-                    ),
+                    duration: Motion.of(context, const Duration(milliseconds: 300)),
                     curve: Motion.ease,
                     height: i < score ? 7 : 5,
-                    decoration: BoxDecoration(
-                      color: i < score ? color : Palette.high,
-                      borderRadius: Frame.pill,
-                    ),
+                    decoration: BoxDecoration(color: i < score ? color : Palette.high, borderRadius: Frame.pill),
                   ),
                 ),
             ],
           ),
           ExcludeSemantics(
             child: Text(
-              const [
-                'Type a password',
-                'Too short',
-                'Okay',
-                'Good',
-                'Strong',
-              ][score],
+              const ['Type a password', 'Too short', 'Okay', 'Good', 'Strong'][score],
               style: AppType.body(size: 13, color: Palette.muted),
             ),
           ),
@@ -354,31 +348,31 @@ class _PasswordRules extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Wrap(
-        spacing: 14,
-        runSpacing: 6,
-        children: [
-          for (final (rule, ok) in Validators.passwordRules(password))
-            Semantics(
-              label: '$rule: ${ok ? 'done' : 'not yet'}',
-              excludeSemantics: true,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                spacing: 4,
-                children: [
-                  AnimatedSwitcher(
-                    duration: Motion.of(context, const Duration(milliseconds: 200)),
-                    transitionBuilder: (child, a) => ScaleTransition(scale: a, child: child),
-                    child: Icon(
-                      ok ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                      key: ValueKey(ok),
-                      size: 16,
-                      color: ok ? Palette.link : Palette.muted,
-                    ),
-                  ),
-                  Text(rule, style: AppType.body(size: 13, color: ok ? Palette.ink : Palette.muted)),
-                ],
+    spacing: 14,
+    runSpacing: 6,
+    children: [
+      for (final (rule, ok) in Validators.passwordRules(password))
+        Semantics(
+          label: '$rule: ${ok ? 'done' : 'not yet'}',
+          excludeSemantics: true,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            spacing: 4,
+            children: [
+              AnimatedSwitcher(
+                duration: Motion.of(context, const Duration(milliseconds: 200)),
+                transitionBuilder: (child, a) => ScaleTransition(scale: a, child: child),
+                child: Icon(
+                  ok ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                  key: ValueKey(ok),
+                  size: 16,
+                  color: ok ? Palette.link : Palette.muted,
+                ),
               ),
-            ),
-        ],
-      );
+              Text(rule, style: AppType.body(size: 13, color: ok ? Palette.ink : Palette.muted)),
+            ],
+          ),
+        ),
+    ],
+  );
 }

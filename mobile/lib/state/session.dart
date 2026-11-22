@@ -4,6 +4,7 @@ import '../api/api_exception.dart';
 import '../api/crewmatch_api.dart';
 import '../models/auth_result.dart';
 import '../models/user.dart';
+import 'google_auth.dart';
 import 'token_store.dart';
 
 /// Who is signed in. Owns the API, restores the saved token on launch and
@@ -52,6 +53,10 @@ class Session extends ChangeNotifier {
   Future<void> signIn(String email, String password) =>
       _start(api.login(email.trim(), password));
 
+  /// "Continue with Google": the API checks Google's ID token and signs in,
+  /// or creates a verified account.
+  Future<void> signInWithGoogle(String idToken) => _start(api.googleSignIn(idToken));
+
   Future<void> register(String name, String email, String password) =>
       _start(api.register(name.trim(), email.trim(), password));
 
@@ -85,6 +90,7 @@ class Session extends ChangeNotifier {
     this.notice = notice;
     notifyListeners();
     await _tokens.clear();
+    await GoogleAuth.signOut();
   }
 }
 

@@ -31,6 +31,9 @@ export const registerSchema = z.object({
 
 export const verifySchema = z.object({ code: z.string().trim().regex(/^\d{6}$/, 'Enter the 6-digit code') });
 
+// An ID token from Google sign-in (a JWT, usually 900-1500 characters).
+export const googleSchema = z.object({ idToken: z.string().min(20).max(5000) });
+
 export const loginSchema = z.object({
   email: z.email('Enter a valid email address').trim().toLowerCase(),
   password: z.string().min(1, 'Enter your password'),
