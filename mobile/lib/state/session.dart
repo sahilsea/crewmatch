@@ -28,6 +28,9 @@ class Session extends ChangeNotifier {
   /// A message for the sign-in screen, e.g. why the user was signed out.
   String? notice;
 
+  /// The email code to show on screen when the server can't send email.
+  String? devCode;
+
   /// Signs back in with the saved token, if there is one and it still works.
   Future<void> restore() async {
     final token = await _tokens.read();
@@ -57,6 +60,7 @@ class Session extends ChangeNotifier {
     api.client.token = result.token;
     await _tokens.write(result.token);
     _user = result.user;
+    devCode = result.devCode;
     notice = null;
     notifyListeners();
   }
@@ -77,6 +81,7 @@ class Session extends ChangeNotifier {
     if (_user == null && api.client.token == null) return;
     api.client.token = null;
     _user = null;
+    devCode = null;
     this.notice = notice;
     notifyListeners();
     await _tokens.clear();

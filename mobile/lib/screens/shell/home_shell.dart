@@ -6,7 +6,9 @@ import '../posts/posts_screen.dart';
 import '../leaderboard/leaderboard_screen.dart';
 import '../matches/matches_screen.dart';
 import 'app_tab.dart';
+import '../../ui/ui.dart';
 import 'dock.dart';
+import 'side_rail.dart';
 import 'top_menu_bar.dart';
 
 /// The signed-in app: menu bar on top, the current tab, the dock below.
@@ -33,28 +35,57 @@ class _HomeShellState extends State<HomeShell> {
         _visit++;
       });
 
+  Widget _screen(bool wide) => KeyedSubtree(
+        key: ValueKey((_tab, _visit, wide)),
+        child: switch (_tab) {
+          AppTab.discover => DiscoverScreen(onOpen: _open, wide: wide),
+          AppTab.matches => MatchesScreen(onOpen: _open, wide: wide),
+          AppTab.crew => CrewScreen(onOpen: _open, wide: wide),
+          AppTab.posts => PostsScreen(onOpen: _open, wide: wide),
+          AppTab.ranks => LeaderboardScreen(onOpen: _open, wide: wide),
+        },
+      );
+
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    final size = WindowSize.of(context);
+    // Tablets and browsers: a side rail instead of the top and bottom bars.
+    if (size.hasRail) {
+      return Scaffold(
         body: SafeArea(
-          bottom: false,
-          child: Column(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const TopMenuBar(trailing: AccountMenu()),
+              SideRail(selected: _tab, onSelected: _open),
+              // On very wide monitors the content stays a balanced width,
+              // centred, instead of stretching into long empty lines.
               Expanded(
-                child: KeyedSubtree(
-                  key: ValueKey((_tab, _visit)),
-                  child: switch (_tab) {
-                    AppTab.discover => DiscoverScreen(onOpen: _open),
-                    AppTab.matches => MatchesScreen(onOpen: _open),
-                    AppTab.crew => CrewScreen(onOpen: _open),
-                    AppTab.posts => PostsScreen(onOpen: _open),
-                    AppTab.ranks => LeaderboardScreen(onOpen: _open),
-                  },
+                child: LayoutBuilder(
+                  builder: (context, c) => Center(
+                    child: SizedBox(
+                      width: c.maxWidth.clamp(0, size.twoPane ? 1320 : c.maxWidth).toDouble(),
+                      height: c.maxHeight,
+                      child: _screen(size.twoPane),
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
         ),
-        bottomNavigationBar: Dock(selected: _tab, onSelected: _open),
       );
+    }
+    return Scaffold(
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            const TopMenuBar(trailing: AccountMenu()),
+            Expanded(child: _screen(false)),
+          ],
+        ),
+      ),
+      bottomNavigationBar: Dock(selected: _tab, onSelected: _open),
+    );
+  }
 }

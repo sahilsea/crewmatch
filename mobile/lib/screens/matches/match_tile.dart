@@ -4,6 +4,7 @@ import '../../models/crew.dart';
 import '../../models/user.dart';
 import '../../ui/ui.dart';
 import '../../util/labels.dart';
+import 'person_activity.dart';
 
 /// One match as a compact row: avatar, name, role, fit and an Add button.
 /// Tapping the row opens their details, with email and Unmatch.
@@ -15,9 +16,16 @@ class MatchTile extends StatelessWidget {
     required this.onAddToCrew,
     required this.onRemoveFromCrew,
     required this.onUnmatch,
+    this.onSelect,
+    this.selected = false,
   });
 
   final User person;
+
+  /// Wide screens: tapping selects the row for the details pane instead of
+  /// opening a sheet.
+  final VoidCallback? onSelect;
+  final bool selected;
 
   /// Your crew, if you have one.
   final Crew? crew;
@@ -31,11 +39,11 @@ class MatchTile extends StatelessWidget {
     final added = crew != null && crew.hasMember(person.id);
     final role = person.role == null ? '' : optionLabel(person.role!);
     return Material(
-      type: MaterialType.transparency,
+      color: selected ? Palette.strip : Colors.transparent,
       shape: const RoundedRectangleBorder(borderRadius: Frame.radius),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => _showDetails(context),
+        onTap: onSelect ?? () => _showDetails(context),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           child: Row(
@@ -82,45 +90,20 @@ class MatchTile extends StatelessWidget {
 
   void _showDetails(BuildContext context) => showModalBottomSheet<void>(
         context: context,
-        builder: (context) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              spacing: 12,
-              children: [
-                Row(
-                  spacing: 14,
-                  children: [
-                    Avatar(url: person.avatar, name: person.name, size: 56, background: Palette.pink),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        spacing: 2,
-                        children: [
-                          Text(person.name, style: AppType.title(size: 20)),
-                          Text(personMeta(person), style: AppType.body(size: 14, color: Palette.muted)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                if (person.bio.isNotEmpty) Text(person.bio, style: AppType.body(size: 15)),
-                if (person.skills.isNotEmpty)
-                  Wrap(spacing: 6, runSpacing: 6, children: [for (final s in person.skills) InfoTag(s, color: Palette.strip, textColor: Palette.ink)]),
-                if (person.email case final email?) CopyText(email),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      onUnmatch();
-                    },
-                    child: const Text('Unmatch'),
-                  ),
-                ),
-              ],
+        isScrollControlled: true,
+        builder: (context) => DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.75,
+          maxChildSize: 0.95,
+          builder: (context, scroll) => SingleChildScrollView(
+            controller: scroll,
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            child: MatchDetails(
+              person: person,
+              onUnmatch: () {
+                Navigator.of(context).pop();
+                onUnmatch();
+              },
             ),
           ),
         ),
@@ -180,6 +163,66 @@ class _AddButton extends StatelessWidget {
               ),
               child: const Text('Add'),
             ),
+    );
+  }
+}
+
+/// Everything about a match: who they are, how to reach them, [actions]
+/// (e.g. Add to crew), Unmatch, and their posts and activity.
+class MatchDetails extends StatelessWidget {
+  const MatchDetails({super.key, required this.person, required this.onUnmatch, this.actions = const [], this.large = false});
+
+  final User person;
+  final VoidCallback onUnmatch;
+  final List<Widget> actions;
+
+  /// The roomier version for the wide details pane.
+  final bool large;
+
+  @override
+  Widget build(BuildContext context) {
+    final (accent, _) = CardStyle.accent(person.accent);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      spacing: large ? 18 : 12,
+      children: [
+        Row(
+          spacing: large ? 22 : 14,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+              child: Avatar(url: person.avatar, name: person.name, size: large ? 112 : 56, background: Palette.pink),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: 4,
+                children: [
+                  Text(person.name, style: AppType.title(size: large ? 32 : 20)),
+                  Text(personMeta(person), style: AppType.body(size: large ? 16 : 14, color: Palette.muted)),
+                  if (person.score case final score?) InfoTag('$score% fit', icon: Icons.bolt_rounded),
+                ],
+              ),
+            ),
+          ],
+        ),
+        if (person.headline.isNotEmpty) Text(person.headline, style: AppType.body(size: large ? 18 : 16, weight: FontWeight.w500)),
+        if (person.bio.isNotEmpty) Text(person.bio, style: AppType.body(size: large ? 16 : 15, height: 1.5)),
+        if (person.skills.isNotEmpty)
+          Wrap(spacing: 6, runSpacing: 6, children: [for (final s in person.skills) InfoTag(s, color: Palette.strip, textColor: Palette.ink)]),
+        if (person.email case final email?) CopyText(email),
+        Row(
+          spacing: 10,
+          children: [
+            ...actions,
+            const Spacer(),
+            TextButton(onPressed: onUnmatch, child: const Text('Unmatch')),
+          ],
+        ),
+        PersonActivity(userId: person.id),
+      ],
     );
   }
 }

@@ -69,9 +69,12 @@ let userCount = 0;
 async function newUser({ profile = PROFILE } = {}) {
   userCount += 1;
   const { status, body } = await api('POST', '/auth/register', {
-    body: { name: `Tester ${userCount}`, email: `tester${userCount}@test.dev`, password: 'secret123' },
+    // Names are letters only: 1 → "Tester B", 27 → "Tester BB".
+    body: { name: `Tester ${(userCount + 26).toString(26).replace(/\d/g, (d) => 'abcdefghij'[d]).toUpperCase()}`, email: `tester${userCount}@test.dev`, password: 'secret123' },
   });
   assert.equal(status, 201);
+  // No email is set up in tests, so the code comes back in the response.
+  assert.equal((await api('POST', '/auth/verify', { token: body.token, body: { code: body.devCode } })).status, 200);
   if (profile) await api('PUT', '/users/me', { token: body.token, body: profile });
   return { token: body.token, id: body.user.id };
 }
@@ -812,5 +815,137 @@ describe('crew chat', () => {
     const note = messages.find((m) => m.kind === 'system');
     assert.match(note.text, /checked the crew in at Test workshop · \+50/);
     assert.equal(note.author, null);
+  });
+});
+
+describe('swipe cards', () => {
+  test('profile picture, cover photo and card settings show on the public profile', async () => {
+    const me = await newUser();
+    const other = await newUser();
+    const avatar = await api('POST', '/users/me/avatar', { token: me.token, body: { photo: PIXEL } });
+    assert.equal(avatar.status, 200, JSON.stringify(avatar.body));
+    assert.match(avatar.body.user.avatar, /^\/api\/photos\/[0-9a-f]{24}$/);
+
+    assert.equal((await api('PUT', '/users/me', { token: me.token, body: { cover: 'photo' } })).status, 400);
+    const cover = await api('POST', '/users/me/cover', { token: me.token, body: { photo: PIXEL } });
+    assert.equal(cover.body.user.cover, 'photo');
+    const saved = await api('PUT', '/users/me', {
+      token: me.token, body: { headline: 'Ship it 🚀', accent: 'teal', cardFields: ['skills', 'interests'] },
+    });
+    assert.equal(saved.status, 200, JSON.stringify(saved.body));
+
+    const seen = (await api('GET', `/users/${me.id}`, { token: other.token })).body.user;
+    assert.equal(seen.headline, 'Ship it 🚀');
+    assert.equal(seen.accent, 'teal');
+    assert.deepEqual(seen.cardFields, ['skills', 'interests']);
+    assert.match(seen.coverUrl, /^\/api\/photos\//);
+
+    // Replacing the picture deletes the old one.
+    const oldUrl = avatar.body.user.avatar;
+    await api('POST', '/users/me/avatar', { token: me.token, body: { photo: PIXEL } });
+    assert.equal((await fetch(`http://127.0.0.1:${PORT}${oldUrl}`)).status, 404);
+    assert.equal((await api('DELETE', '/users/me/avatar', { token: me.token })).body.user.avatar, '');
+    assert.equal((await api('DELETE', '/users/me/cover', { token: me.token })).body.user.cover, 'dusk');
+    assert.equal((await api('PUT', '/users/me', { token: me.token, body: { accent: 'neon' } })).status, 400);
+  });
+
+  test("someone's posts and activity", async () => {
+    const crew = await newCrew('Busy Crew');
+    await api('POST', '/posts', { token: crew.a.token, body: { text: 'First post' } });
+    const event = await createEvent({ checkinCode: 'BUSY' });
+    await api('POST', `/events/${event.id}/checkin`, { token: crew.a.token, body: { code: 'BUSY' } });
+
+    const posts = (await api('GET', `/users/${crew.a.id}/posts`, { token: crew.b.token })).body.posts;
+    assert.deepEqual(posts.map((p) => p.text), ['First post']);
+    const { activity } = (await api('GET', `/users/${crew.a.id}/activity`, { token: crew.b.token })).body;
+    const texts = activity.map((a) => a.text);
+    assert.ok(texts.includes('Busy Crew checked in at Test workshop · +50'), texts.join(' | '));
+    assert.ok(texts.includes('Posted “First post”'));
+    assert.ok(texts.includes('Joined Busy Crew'));
+    assert.equal(texts.at(-1), 'Matched with you');
+  });
+});
+
+describe('chat attachments', () => {
+  const DOC = `data:application/pdf;base64,${Buffer.from('%PDF-1.4 hello').toString('base64')}`;
+
+  test('photos and documents; documents are crew-only', async () => {
+    const crew = await newCrew('Sharers');
+    const outsider = await newCrew('Outsiders');
+    const photo = await api('POST', '/crews/mine/messages', { token: crew.a.token, body: { photo: PIXEL } });
+    assert.equal(photo.status, 201, JSON.stringify(photo.body));
+    assert.equal(photo.body.message.attachment.kind, 'photo');
+    assert.equal(photo.body.message.text, '');
+
+    const doc = await api('POST', '/crews/mine/messages', {
+      token: crew.a.token, body: { text: 'Deck v1', file: { name: 'Pitch deck.pdf', data: DOC } },
+    });
+    const att = doc.body.message.attachment;
+    assert.deepEqual([att.kind, att.name, att.type], ['file', 'Pitch deck.pdf', 'application/pdf']);
+
+    const mine = await fetch(`http://127.0.0.1:${PORT}${att.url}`, { headers: { Authorization: `Bearer ${crew.b.token}` } });
+    assert.equal(mine.status, 200);
+    assert.equal(await mine.text(), '%PDF-1.4 hello');
+    const theirs = await fetch(`http://127.0.0.1:${PORT}${att.url}`, { headers: { Authorization: `Bearer ${outsider.a.token}` } });
+    assert.equal(theirs.status, 404);
+
+    assert.equal((await api('POST', '/crews/mine/messages', { token: crew.a.token, body: {} })).status, 400);
+    const exe = await api('POST', '/crews/mine/messages', {
+      token: crew.a.token, body: { file: { name: 'x.exe', data: 'data:application/x-msdownload;base64,TVo=' } },
+    });
+    assert.equal(exe.status, 400);
+  });
+});
+
+describe('sign-up checks and email verification', () => {
+  test('weak passwords, bad names and bad emails are refused with a reason', async () => {
+    const cases = [
+      [{ name: 'Ana Gomez', email: 'ana@test.dev', password: 'short1' }, 'password', 'Use at least 8 characters'],
+      [{ name: 'Ana Gomez', email: 'ana@test.dev', password: 'lettersonly' }, 'password', 'Add at least one number'],
+      [{ name: 'Ana Gomez', email: 'ana@test.dev', password: '12345678' }, 'password', 'Add at least one letter'],
+      [{ name: 'A', email: 'ana@test.dev', password: 'secret123' }, 'name', 'Enter your full name'],
+      [{ name: 'R2D2', email: 'ana@test.dev', password: 'secret123' }, 'name', 'Use letters only in your name'],
+      [{ name: 'Ana Gomez', email: 'not-an-email', password: 'secret123' }, 'email', 'Enter a valid email address'],
+    ];
+    for (const [body, field, message] of cases) {
+      const res = await api('POST', '/auth/register', { body });
+      assert.equal(res.status, 400, JSON.stringify(body));
+      assert.deepEqual(res.body.details.find((d) => d.field === field)?.message, message);
+    }
+  });
+
+  test('a new account must verify its email before using the app', async () => {
+    const reg = await api('POST', '/auth/register', { body: { name: 'Vera Fied', email: 'vera@test.dev', password: 'secret123' } });
+    assert.equal(reg.status, 201);
+    assert.equal(reg.body.user.emailVerified, false);
+    assert.match(reg.body.devCode, /^\d{6}$/);
+    const token = reg.body.token;
+
+    assert.equal((await api('GET', '/deck', { token })).status, 403);
+    assert.equal((await api('GET', '/auth/me', { token })).status, 200, 'you can still see yourself');
+
+    const wrongCode = reg.body.devCode === '000000' ? '111111' : '000000';
+    const wrong = await api('POST', '/auth/verify', { token, body: { code: wrongCode } });
+    assert.deepEqual([wrong.status, wrong.body.error], [400, 'Wrong code. 4 tries left']);
+    assert.equal((await api('POST', '/auth/verify', { token, body: { code: '12' } })).status, 400);
+
+    // Asking again straight away is throttled.
+    assert.equal((await api('POST', '/auth/resend', { token })).status, 429);
+
+    const ok = await api('POST', '/auth/verify', { token, body: { code: reg.body.devCode } });
+    assert.equal(ok.status, 200);
+    assert.equal(ok.body.user.emailVerified, true);
+    assert.equal((await api('GET', '/posts', { token })).status, 200);
+  });
+
+  test('five wrong passwords lock the account for a while', async () => {
+    await newUser();
+    const email = `tester${userCount}@test.dev`;
+    for (let i = 0; i < 5; i++) {
+      assert.equal((await api('POST', '/auth/login', { body: { email, password: 'wrong-pass1' } })).status, 401);
+    }
+    const locked = await api('POST', '/auth/login', { body: { email, password: 'secret123' } });
+    assert.equal(locked.status, 429);
+    assert.match(locked.body.error, /Too many wrong passwords/);
   });
 });

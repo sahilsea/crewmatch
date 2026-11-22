@@ -15,9 +15,12 @@ import 'post_card.dart';
 /// The Posts tab: what's happening now at the hackathon, then the feed
 /// everyone posts to.
 class PostsScreen extends StatefulWidget {
-  const PostsScreen({super.key, required this.onOpen});
+  const PostsScreen({super.key, required this.onOpen, this.wide = false});
 
   final OpenTab onOpen;
+
+  /// Wide windows: the feed in a readable column, events in a sidebar.
+  final bool wide;
 
   @override
   State<PostsScreen> createState() => _PostsScreenState();
@@ -50,7 +53,10 @@ class _PostsScreenState extends State<PostsScreen> {
   Future<void> _load() async {
     final api = context.api;
     // Events are a bonus on this tab: if they fail, the feed still shows.
-    final events = api.events(kind: EventKind.event).then<List<HubEvent>?>((e) => e).catchError((_) => null);
+    final events = api
+        .events(kind: EventKind.event)
+        .then<List<HubEvent>?>((e) => e)
+        .catchError((_) => null);
     try {
       final page = await api.posts();
       final now = await events;
@@ -58,7 +64,10 @@ class _PostsScreenState extends State<PostsScreen> {
       setState(() {
         _posts = page.posts;
         _hasMore = page.hasMore;
-        _events = [for (final e in now ?? const <HubEvent>[]) if (e.state != EventState.ended) e];
+        _events = [
+          for (final e in now ?? const <HubEvent>[])
+            if (e.state != EventState.ended) e,
+        ];
         _error = null;
       });
     } catch (e) {
@@ -71,16 +80,22 @@ class _PostsScreenState extends State<PostsScreen> {
     if (!_hasMore || _loadingMore || posts == null || posts.isEmpty) return;
     if (_scroll.position.extentAfter > 600) return;
     _loadingMore = true;
-    context.api.posts(before: posts.last.createdAt).then((page) {
-      if (!mounted) return;
-      setState(() {
-        _posts = [...posts, ...page.posts];
-        _hasMore = page.hasMore;
-      });
-    }).catchError((_) {}).whenComplete(() => _loadingMore = false);
+    context.api
+        .posts(before: posts.last.createdAt)
+        .then((page) {
+          if (!mounted) return;
+          setState(() {
+            _posts = [...posts, ...page.posts];
+            _hasMore = page.hasMore;
+          });
+        })
+        .catchError((_) {})
+        .whenComplete(() => _loadingMore = false);
   }
 
-  void _replace(Post post) => setState(() => _posts = [for (final p in _posts!) p.id == post.id ? post : p]);
+  void _replace(Post post) => setState(
+    () => _posts = [for (final p in _posts!) p.id == post.id ? post : p],
+  );
 
   Future<void> _like(Post post) async {
     // Instant on screen; the server's answer settles the count.
@@ -99,7 +114,12 @@ class _PostsScreenState extends State<PostsScreen> {
   }
 
   Future<void> _delete(Post post) async {
-    final confirmed = await confirmAction(context, title: 'Delete post', message: 'Delete this post for everyone?', confirmLabel: 'Delete');
+    final confirmed = await confirmAction(
+      context,
+      title: 'Delete post',
+      message: 'Delete this post for everyone?',
+      confirmLabel: 'Delete',
+    );
     if (!confirmed || !mounted) return;
     try {
       await context.api.deletePost(post.id);
@@ -117,7 +137,11 @@ class _PostsScreenState extends State<PostsScreen> {
       _posts = [post, ...?_posts];
     });
     if (_scroll.hasClients) {
-      _scroll.animateTo(0, duration: Motion.of(context, const Duration(milliseconds: 400)), curve: Motion.ease);
+      _scroll.animateTo(
+        0,
+        duration: Motion.of(context, const Duration(milliseconds: 400)),
+        curve: Motion.ease,
+      );
     }
     showNotice(context, 'Posted');
   }
@@ -133,7 +157,8 @@ class _PostsScreenState extends State<PostsScreen> {
     }
   }
 
-  void _allEvents() => Navigator.of(context).push(EventsScreen.route(widget.onOpen)).then((_) {
+  void _allEvents() =>
+      Navigator.of(context).push(EventsScreen.route(widget.onOpen)).then((_) {
         if (mounted) _load();
       });
 
@@ -141,6 +166,39 @@ class _PostsScreenState extends State<PostsScreen> {
   Widget build(BuildContext context) {
     final posts = _posts;
     final myId = context.session.user?.id;
+    final feed = _feed(posts, myId);
+    if (!widget.wide) return feed;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 680),
+              child: feed,
+            ),
+          ),
+        ),
+        const VerticalDivider(width: 1),
+        SizedBox(
+          width: 340,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(0, 20, 0, 20),
+            children: [
+              _HappeningNow(
+                events: _events,
+                onCheckIn: _checkIn,
+                onAll: _allEvents,
+                vertical: true,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _feed(List<Post>? posts, String? myId) {
     return Stack(
       children: [
         Column(
@@ -150,14 +208,14 @@ class _PostsScreenState extends State<PostsScreen> {
             Expanded(
               child: posts == null
                   ? (_error == null
-                      ? const LoadingView()
-                      : ErrorView(
-                          error: _error!,
-                          onRetry: () {
-                            setState(() => _error = null);
-                            _load();
-                          },
-                        ))
+                        ? const LoadingView()
+                        : ErrorView(
+                            error: _error!,
+                            onRetry: () {
+                              setState(() => _error = null);
+                              _load();
+                            },
+                          ))
                   : RefreshIndicator(
                       onRefresh: _load,
                       child: ListView(
@@ -165,23 +223,50 @@ class _PostsScreenState extends State<PostsScreen> {
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.only(top: 4, bottom: 96),
                         children: [
-                          _HappeningNow(events: _events, onCheckIn: _checkIn, onAll: _allEvents),
-                          const SizedBox(height: 14),
+                          if (!widget.wide) ...[
+                            _HappeningNow(
+                              events: _events,
+                              onCheckIn: _checkIn,
+                              onAll: _allEvents,
+                            ),
+                            const SizedBox(height: 14),
+                          ],
                           if (posts.isEmpty)
-                            const EmptyState(title: 'No posts yet', message: 'Be the first to post.')
+                            const EmptyState(
+                              title: 'No posts yet',
+                              message: 'Be the first to post.',
+                            )
                           else
                             for (final (i, post) in posts.indexed)
                               Padding(
                                 key: ValueKey(post.id),
-                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  0,
+                                  16,
+                                  10,
+                                ),
                                 child: _fresh.contains(post.id)
-                                    ? Rise(offset: -16, child: _card(post, myId))
-                                    : Rise(delay: Motion.stagger(i, stepMs: 70), child: _card(post, myId)),
+                                    ? Rise(
+                                        offset: -16,
+                                        child: _card(post, myId),
+                                      )
+                                    : Rise(
+                                        delay: Motion.stagger(i, stepMs: 70),
+                                        child: _card(post, myId),
+                                      ),
                               ),
                           if (_hasMore)
                             const Padding(
                               padding: EdgeInsets.all(16),
-                              child: Center(child: SizedBox.square(dimension: 24, child: CircularProgressIndicator(strokeWidth: 2.5))),
+                              child: Center(
+                                child: SizedBox.square(
+                                  dimension: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                  ),
+                                ),
+                              ),
                             ),
                         ],
                       ),
@@ -200,7 +285,14 @@ class _PostsScreenState extends State<PostsScreen> {
               foregroundColor: Palette.onCrimson,
               shape: const RoundedRectangleBorder(borderRadius: Frame.radius),
               icon: const Icon(Icons.edit_outlined),
-              label: Text('New post', style: AppType.body(size: 15, weight: FontWeight.w500, color: Palette.onCrimson)),
+              label: Text(
+                'New post',
+                style: AppType.body(
+                  size: 15,
+                  weight: FontWeight.w500,
+                  color: Palette.onCrimson,
+                ),
+              ),
             ),
           ),
         ),
@@ -209,65 +301,119 @@ class _PostsScreenState extends State<PostsScreen> {
   }
 
   Widget _card(Post post, String? myId) => PostCard(
-        post: post,
-        mine: post.author.id == myId,
-        onLike: () => _like(post),
-        onComments: () => _comments(post),
-        onDelete: () => _delete(post),
-      );
+    post: post,
+    mine: post.author.id == myId,
+    onLike: () => _like(post),
+    onComments: () => _comments(post),
+    onDelete: () => _delete(post),
+  );
 }
 
 /// A sideways row of live and upcoming events, with a link to all of them.
 class _HappeningNow extends StatelessWidget {
-  const _HappeningNow({required this.events, required this.onCheckIn, required this.onAll});
+  const _HappeningNow({
+    required this.events,
+    required this.onCheckIn,
+    required this.onAll,
+    this.vertical = false,
+  });
 
   final List<HubEvent> events;
   final ValueChanged<HubEvent> onCheckIn;
   final VoidCallback onAll;
 
+  /// A column of cards, for the wide sidebar.
+  final bool vertical;
+
   @override
   Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: 6,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 20, right: 8),
-            child: Row(
-              children: [
-                Expanded(child: Text('Happening now', style: AppType.body(size: 16, weight: FontWeight.w700))),
-                TextButton(
-                  onPressed: onAll,
-                  child: const Row(mainAxisSize: MainAxisSize.min, children: [Text('All events'), Icon(Icons.chevron_right_rounded, size: 20)]),
-                ),
-              ],
-            ),
-          ),
-          if (events.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Text('Nothing on right now.', style: AppType.body(size: 14, color: Palette.muted)),
-            )
-          else
-            SizedBox(
-              height: 164,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: events.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 10),
-                itemBuilder: (context, i) => SlideIn(
-                  delay: Motion.stagger(i, stepMs: 80),
-                  child: _EventTile(event: events[i], onCheckIn: () => onCheckIn(events[i]), onOpen: onAll),
-                ),
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    spacing: 6,
+    children: [
+      Padding(
+        padding: const EdgeInsets.only(left: 20, right: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Happening now',
+                style: AppType.body(size: 16, weight: FontWeight.w700),
               ),
             ),
-        ],
-      );
+            TextButton(
+              onPressed: onAll,
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('All events'),
+                  Icon(Icons.chevron_right_rounded, size: 20),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      if (events.isEmpty)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            'Nothing on right now.',
+            style: AppType.body(size: 14, color: Palette.muted),
+          ),
+        )
+      else if (vertical)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            spacing: 10,
+            children: [
+              for (final (i, e) in events.indexed)
+                SlideIn(
+                  delay: Motion.stagger(i, stepMs: 80),
+                  child: SizedBox(
+                    height: 164,
+                    child: _EventTile(
+                      event: e,
+                      onCheckIn: () => onCheckIn(e),
+                      onOpen: onAll,
+                      fullWidth: true,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        )
+      else
+        SizedBox(
+          height: 164,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: events.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 10),
+            itemBuilder: (context, i) => SlideIn(
+              delay: Motion.stagger(i, stepMs: 80),
+              child: _EventTile(
+                event: events[i],
+                onCheckIn: () => onCheckIn(events[i]),
+                onOpen: onAll,
+              ),
+            ),
+          ),
+        ),
+    ],
+  );
 }
 
 class _EventTile extends StatelessWidget {
-  const _EventTile({required this.event, required this.onCheckIn, required this.onOpen});
+  const _EventTile({
+    required this.event,
+    required this.onCheckIn,
+    required this.onOpen,
+    this.fullWidth = false,
+  });
 
+  final bool fullWidth;
   final HubEvent event;
   final VoidCallback onCheckIn;
   final VoidCallback onOpen;
@@ -279,9 +425,13 @@ class _EventTile extends StatelessWidget {
     final done = e.isCompleted;
     final start = e.startsAt.toLocal();
     return Container(
-      width: 236,
+      width: fullWidth ? double.infinity : 236,
       padding: const EdgeInsets.all(14),
-      decoration: const BoxDecoration(color: Palette.window, borderRadius: Frame.radius, border: Frame.border),
+      decoration: const BoxDecoration(
+        color: Palette.window,
+        borderRadius: Frame.radius,
+        border: Frame.border,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -290,26 +440,59 @@ class _EventTile extends StatelessWidget {
               if (live)
                 const LivePill()
               else
-                InfoTag('${start.hour.toString().padLeft(2, '0')}:${start.minute.toString().padLeft(2, '0')}',
-                    color: Palette.navy, textColor: Palette.cream),
+                InfoTag(
+                  '${start.hour.toString().padLeft(2, '0')}:${start.minute.toString().padLeft(2, '0')}',
+                  color: Palette.navy,
+                  textColor: Palette.cream,
+                ),
               const Spacer(),
               InfoTag('+${e.points}'),
             ],
           ),
           const SizedBox(height: 10),
-          Text(e.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.body(size: 16, weight: FontWeight.w700, height: 1.25)),
-          Text(e.location, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.body(size: 13, color: Palette.muted)),
+          Text(
+            e.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppType.body(
+              size: 16,
+              weight: FontWeight.w700,
+              height: 1.25,
+            ),
+          ),
+          Text(
+            e.location,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppType.body(size: 13, color: Palette.muted),
+          ),
           const Spacer(),
           if (done)
             FilledButton(
               onPressed: null,
-              style: FilledButton.styleFrom(minimumSize: const Size(0, 40), disabledBackgroundColor: Palette.navy, disabledForegroundColor: Palette.cream),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 40),
+                disabledBackgroundColor: Palette.navy,
+                disabledForegroundColor: Palette.cream,
+              ),
               child: const Text('✓ Checked in'),
             )
           else if (live && e.canCheckIn(DateTime.now()))
-            FilledButton(onPressed: onCheckIn, style: FilledButton.styleFrom(minimumSize: const Size(0, 40)), child: const Text('Check in'))
+            FilledButton(
+              onPressed: onCheckIn,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 40),
+                backgroundColor: fullWidth ? Palette.gold : null,
+                foregroundColor: fullWidth ? Palette.onGold : null,
+              ),
+              child: const Text('Check in'),
+            )
           else
-            OutlinedButton(onPressed: onOpen, style: OutlinedButton.styleFrom(minimumSize: const Size(0, 40)), child: const Text('Details')),
+            OutlinedButton(
+              onPressed: onOpen,
+              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 40)),
+              child: const Text('Details'),
+            ),
         ],
       ),
     );

@@ -11,6 +11,12 @@ export const OPTIONS = {
 };
 
 export const MAX_SUPERPOWERS = 2;
+
+// How someone's swipe card looks (the card editor in the app).
+export const CARD_COVERS = ['dusk', 'gold', 'midnight', 'parchment', 'circuit', 'photo'];
+export const CARD_ACCENTS = ['crimson', 'gold', 'navy', 'teal', 'plum'];
+export const CARD_FIELDS = ['superpowers', 'skills', 'interests', 'experience', 'schedule'];
+export const DEFAULT_CARD_FIELDS = ['superpowers', 'skills', 'experience'];
 export const MAX_CREW_SIZE = 4;
 export const MIN_DECK_SCORE = 40;
 

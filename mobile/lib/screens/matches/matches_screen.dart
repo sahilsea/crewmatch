@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../api/api_exception.dart';
@@ -11,9 +12,12 @@ import 'match_tile.dart';
 
 /// People who swiped right on you too, with unmatch and add-to-crew.
 class MatchesScreen extends StatefulWidget {
-  const MatchesScreen({super.key, required this.onOpen});
+  const MatchesScreen({super.key, required this.onOpen, this.wide = false});
 
   final OpenTab onOpen;
+
+  /// Wide windows: the list with the selected match's details beside it.
+  final bool wide;
 
   @override
   State<MatchesScreen> createState() => _MatchesScreenState();
@@ -22,6 +26,7 @@ class MatchesScreen extends StatefulWidget {
 class _MatchesScreenState extends State<MatchesScreen> {
   List<User>? _matches;
   Crew? _crew;
+  String? _selectedId;
   Object? _error;
 
   @override
@@ -139,6 +144,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
                   ),
                 ),
               ),
+            final List<User> list when widget.wide => _wideLayout(list),
             final List<User> list => RefreshIndicator(
                 onRefresh: _load,
                 child: ListView.builder(
@@ -167,6 +173,92 @@ class _MatchesScreenState extends State<MatchesScreen> {
                 ),
               ),
           },
+        ),
+      ],
+    );
+  }
+
+  VoidCallback _addAction(User person) => switch (_crew) {
+        null => () => widget.onOpen(AppTab.crew),
+        final crew when crew.spotsLeft == 0 => () => showNotice(context, 'Your crew is full. Tap “Added” on someone to make room.'),
+        _ => () => _addToCrew(person),
+      };
+
+  /// ↑ and ↓ move through the list, like a mail inbox.
+  void _step(List<User> list, int by) {
+    final i = list.indexWhere((m) => m.id == _selectedId);
+    final next = (i + by).clamp(0, list.length - 1);
+    setState(() => _selectedId = list[next].id);
+  }
+
+  Widget _wideLayout(List<User> list) {
+    final selected = list.firstWhere((m) => m.id == _selectedId, orElse: () => list.first);
+    final inCrew = _crew?.hasMember(selected.id) ?? false;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          width: 400,
+          child: CallbackShortcuts(
+            bindings: {
+              const SingleActivator(LogicalKeyboardKey.arrowDown): () => _step(list, 1),
+              const SingleActivator(LogicalKeyboardKey.arrowUp): () => _step(list, -1),
+            },
+            child: Focus(
+              autofocus: true,
+              child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+                itemCount: list.length,
+                itemBuilder: (context, i) {
+                  final person = list[i];
+                  return SlideIn(
+                    key: ValueKey(person.id),
+                    delay: Motion.stagger(i, stepMs: 70),
+                    child: MatchTile(
+                      person: person,
+                      crew: _crew,
+                      selected: person.id == selected.id,
+                      onSelect: () => setState(() => _selectedId = person.id),
+                      onAddToCrew: _addAction(person),
+                      onRemoveFromCrew: () => _removeFromCrew(person),
+                      onUnmatch: () => _unmatch(person),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+        const VerticalDivider(width: 1),
+        Expanded(
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: AnimatedSwitcher(
+                duration: Motion.of(context, const Duration(milliseconds: 300)),
+                switchInCurve: Motion.ease,
+                child: SingleChildScrollView(
+                  key: ValueKey(selected.id),
+                  padding: const EdgeInsets.fromLTRB(48, 24, 48, 32),
+                  child: MatchDetails(
+                    person: selected,
+                    large: true,
+                    onUnmatch: () => _unmatch(selected),
+                    actions: [
+                      inCrew
+                          ? FilledButton(
+                              onPressed: () => _removeFromCrew(selected),
+                              style: FilledButton.styleFrom(backgroundColor: Palette.navy, foregroundColor: Palette.cream),
+                              child: const Text('✓ In your crew'),
+                            )
+                          : FilledButton(onPressed: _addAction(selected), child: const Text('Add to crew')),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ],
     );

@@ -28,9 +28,7 @@ class _MatchScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final first = them.name.split(' ').first;
     final email = them.email;
-    return Scaffold(
-      backgroundColor: Palette.desktop,
-      body: SafeArea(
+    final page = SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -101,8 +99,37 @@ class _MatchScreen extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
+      );
+    // Wide windows: the celebration sits in a card on the brand gradient,
+    // instead of a phone-width column lost in empty space.
+    if (WindowSize.of(context).hasRail) {
+      return Scaffold(
+        body: DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF22305A), Color(0xFF7A1C1C)]),
+          ),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: PopIn(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480, maxHeight: 590),
+                  child: Material(
+                    color: Palette.desktop,
+                    elevation: 12,
+                    shadowColor: const Color(0x66140C06),
+                    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(28))),
+                    clipBehavior: Clip.antiAlias,
+                    child: page,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    return Scaffold(backgroundColor: Palette.desktop, body: page);
   }
 }
 

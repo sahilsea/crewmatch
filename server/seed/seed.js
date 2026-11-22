@@ -316,6 +316,22 @@ const CHAT = [
   [1, 58, 'On my way'],
 ];
 
+// Card looks for a few students, so the Discover deck isn't all one style.
+const CARDS = {
+  'Diya Patel': ['APIs that never go down during the demo. Here to win 🏆', 'dusk', 'gold'],
+  'Riya Banerjee': ['I turn messy ideas into a 3-minute pitch judges remember', 'gold', 'navy'],
+  'Nisha Verma': ['Dashboards, models and night-owl bug hunts 🦉', 'circuit', 'teal'],
+  'Zoya Khan': ['Keeps the crew on track and the judges smiling', 'parchment', 'plum'],
+  'Aditya Menon': ['ML that ships, not just notebooks', 'midnight', 'crimson'],
+  'Saanvi Joshi': ['Pixel-perfect UI and too much chai ☕', 'gold', 'crimson'],
+};
+
+async function seedCards() {
+  await User.bulkWrite(Object.entries(CARDS).map(([name, [headline, cover, accent]]) => ({
+    updateOne: { filter: { name }, update: { $set: { headline, cover, accent } } },
+  })));
+}
+
 async function seedFeed(crewIds) {
   const people = await User.find({ name: { $in: CREWS.flatMap((c) => c.members) } }, 'name');
   const idOf = new Map(people.map((u) => [u.name, u._id]));
@@ -351,12 +367,14 @@ export async function seedDatabase() {
     avatar: `https://api.dicebear.com/9.x/notionists/png?seed=${encodeURIComponent(u.name)}`,
     ...u,
     password,
+    emailVerified: true,
   }));
   await User.insertMany(docs);
 
   const crewIds = await seedCrews();
   const events = await seedEvents(crewIds);
   await seedFeed(crewIds);
+  await seedCards();
 
   console.log(`Seeded ${docs.length} users. Every seeded account's password: ${SEED_PASSWORD}`);
   console.log('Demo logins: web@crewmatch.dev, mobile@crewmatch.dev, admin@crewmatch.dev');

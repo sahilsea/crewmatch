@@ -7,9 +7,12 @@ import '../shell/app_tab.dart';
 
 /// Crews ranked by hackathon points, with yours highlighted.
 class LeaderboardScreen extends StatefulWidget {
-  const LeaderboardScreen({super.key, required this.onOpen});
+  const LeaderboardScreen({super.key, required this.onOpen, this.wide = false});
 
   final OpenTab onOpen;
+
+  /// Wide windows: hackathons as tabs, the table beside the podium.
+  final bool wide;
 
   @override
   State<LeaderboardScreen> createState() => _LeaderboardScreenState();
@@ -99,7 +102,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             spacing: 10,
             children: [
               Semantics(header: true, child: Text('Leaderboard', style: AppType.title(size: 24))),
-              _SwitcherButton(name: name, status: status, onTap: _openSwitcher),
+              if (widget.wide && _hackathons != null)
+                _HackathonTabs(list: _hackathons!, selectedId: _hackathonId, onPick: _switchTo)
+              else
+                _SwitcherButton(name: name, status: status, onTap: _openSwitcher),
             ],
           ),
         ),
@@ -122,11 +128,85 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                         ))
                   : board.status == HackathonStatus.upcoming
                       ? _Upcoming(startsAt: board.startsAt)
-                      : RefreshIndicator(onRefresh: _load, child: _boardList(board)),
+                      : widget.wide
+                          ? _wideBoard(board)
+                          : RefreshIndicator(onRefresh: _load, child: _boardList(board)),
             ),
           ),
         ),
       ],
+    );
+  }
+
+  /// The full table on the left; the podium and your standing on the right.
+  Widget _wideBoard(Leaderboard board) {
+    final mine = board.myCrew;
+    final rows = board.crews.skip(3).toList();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 32, 24),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 24,
+        children: [
+          Expanded(
+            child: Container(
+              decoration: const BoxDecoration(color: Palette.window, borderRadius: Frame.radius, border: Frame.border),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const _TableRow(header: true, cells: ['RANK', 'CREW', 'COMPLETED', 'POINTS']),
+                  Expanded(
+                    child: rows.isEmpty
+                        ? Center(child: Text(board.crews.isEmpty ? 'No crews yet' : 'Only the top three so far', style: AppType.body(color: Palette.muted)))
+                        : ListView.builder(
+                            itemCount: rows.length,
+                            itemBuilder: (context, i) => SlideIn(
+                              key: ValueKey(rows[i].id),
+                              delay: const Duration(milliseconds: 300) + Motion.stagger(i, stepMs: 50),
+                              child: _TableRow(
+                                mine: rows[i].id == board.myCrewId,
+                                cells: ['${rows[i].rank}', rows[i].name, '${rows[i].completed}', '${rows[i].points}'],
+                              ),
+                            ),
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 440,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              spacing: 16,
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                    decoration: const BoxDecoration(color: Palette.window, borderRadius: Frame.radius, border: Frame.border),
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(child: Text('Top 3', style: AppType.body(size: 16, weight: FontWeight.w700))),
+                            Text(board.status == HackathonStatus.live ? 'Updating live' : 'Final results', style: AppType.body(size: 13, color: Palette.muted)),
+                          ],
+                        ),
+                        const Spacer(),
+                        if (board.crews.isNotEmpty) _Podium(crews: board.crews.take(3).toList(), myCrewId: board.myCrewId),
+                      ],
+                    ),
+                  ),
+                ),
+                if (mine != null) _Standing(board: board, mine: mine),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -516,4 +596,143 @@ class _JoinPrompt extends StatelessWidget {
       ],
     ),
   );
+}
+
+/// One row of the wide ranking table.
+class _TableRow extends StatelessWidget {
+  const _TableRow({required this.cells, this.header = false, this.mine = false});
+
+  final List<String> cells;
+  final bool header;
+  final bool mine;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = header
+        ? AppType.body(size: 12, weight: FontWeight.w500, color: Palette.muted).copyWith(letterSpacing: 0.8)
+        : AppType.body(size: 15);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: BoxDecoration(
+        color: mine ? Color.alphaBlend(Palette.gold.withValues(alpha: 0.22), Palette.window) : null,
+        border: const Border(bottom: Frame.side),
+      ),
+      child: Row(
+        children: [
+          SizedBox(width: 56, child: Text(cells[0], style: header ? style : style.copyWith(fontWeight: FontWeight.w700, color: Palette.muted))),
+          Expanded(
+            child: Row(
+              spacing: 10,
+              children: [
+                if (!header) Avatar(url: '', name: cells[1], size: 32, background: mine ? Palette.gold : Palette.high),
+                Flexible(child: Text(cells[1], maxLines: 1, overflow: TextOverflow.ellipsis, style: style)),
+                if (mine) const InkBadge('You'),
+              ],
+            ),
+          ),
+          SizedBox(width: 120, child: Text(cells[2], style: header ? style : style.copyWith(color: Palette.muted))),
+          SizedBox(width: 80, child: Text(cells[3], textAlign: TextAlign.right, style: header ? style : style.copyWith(fontWeight: FontWeight.w700))),
+        ],
+      ),
+    );
+  }
+}
+
+/// Your crew's place, with how far you are from the crew above.
+class _Standing extends StatelessWidget {
+  const _Standing({required this.board, required this.mine});
+
+  final Leaderboard board;
+  final RankedCrew mine;
+
+  @override
+  Widget build(BuildContext context) {
+    final crews = board.crews;
+    final i = crews.indexWhere((c) => c.id == mine.id);
+    final above = i > 0 ? crews[i - 1] : null;
+    final below = i + 1 < crews.length ? crews[i + 1] : null;
+    final leader = crews.first;
+    final line = above == null
+        ? (below == null ? 'Top of the board' : '${mine.points - below.points} pts ahead of ${below.name}')
+        : '${above.points - mine.points} pts behind ${above.name} (#${above.rank})';
+    final progress = leader.points == 0 ? 1.0 : (mine.points / leader.points).clamp(0.05, 1.0);
+    return Rise(
+      delay: const Duration(milliseconds: 400),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(color: Palette.pink, borderRadius: Frame.radius),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: 12,
+          children: [
+            Row(
+              spacing: 16,
+              children: [
+                Text('#${mine.rank}', style: AppType.title(size: 40, color: Palette.onPink)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(mine.name, style: AppType.body(size: 16, weight: FontWeight.w700, color: Palette.onPink)),
+                      Text(board.status == HackathonStatus.live ? 'Your crew · live' : 'Your crew · final', style: AppType.body(size: 13, color: Palette.onPink)),
+                    ],
+                  ),
+                ),
+                CountUp(mine.points, suffix: ' pts', style: AppType.body(size: 20, weight: FontWeight.w700, color: Palette.onPink)),
+              ],
+            ),
+            ThinProgressBar(value: progress, color: Palette.crimson),
+            Text(line, style: AppType.body(size: 13, weight: FontWeight.w500, color: Palette.onPink)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The hackathons as tabs, for wide windows.
+class _HackathonTabs extends StatelessWidget {
+  const _HackathonTabs({required this.list, required this.selectedId, required this.onPick});
+
+  final HackathonList list;
+  final String selectedId;
+  final ValueChanged<String> onPick;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(4),
+        decoration: const BoxDecoration(color: Palette.strip, borderRadius: Frame.pill),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final h in list.hackathons)
+              Semantics(
+                button: true,
+                selected: h.id == selectedId,
+                child: InkWell(
+                  borderRadius: Frame.pill,
+                  onTap: () => onPick(h.id),
+                  child: AnimatedContainer(
+                    duration: Motion.of(context, const Duration(milliseconds: 250)),
+                    curve: Motion.standard,
+                    height: 40,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(color: h.id == selectedId ? Palette.gold : Colors.transparent, borderRadius: Frame.pill),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      spacing: 8,
+                      children: [
+                        DecoratedBox(
+                          decoration: BoxDecoration(color: _statusColor(h.status), shape: BoxShape.circle),
+                          child: const SizedBox.square(dimension: 8),
+                        ),
+                        Text(h.name, style: AppType.body(size: 14, weight: FontWeight.w500, color: h.id == selectedId ? Palette.onGold : Palette.ink)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
 }

@@ -4,19 +4,53 @@ import '../../models/user.dart';
 import '../../ui/ui.dart';
 import '../../util/labels.dart';
 
-/// One swipe card: photo with the fit tag, name, why they fit and
-/// superpowers.
+/// One swipe card, styled the way its owner set it up: a cover with their
+/// headline, their photo ringed in their accent colour, why they fit, and the
+/// details they chose to show.
 class ProfileCard extends StatelessWidget {
-  const ProfileCard({super.key, required this.person, required this.position});
+  const ProfileCard({
+    super.key,
+    required this.person,
+    this.position = '',
+    this.fitLabel,
+  });
 
   final User person;
 
-  /// "1 of 18", shown under the card by the Discover screen.
+  /// "1 of 18", for screen readers.
   final String position;
 
+  /// Overrides the fit tag, e.g. "Your fit shows here" in your own preview.
+  final String? fitLabel;
+
   @override
-  Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(
+  Widget build(BuildContext context) {
+    final (accent, onAccent) = CardStyle.accent(person.accent);
+    final show = person.cardFields.toSet();
+    final fit =
+        fitLabel ?? (person.score == null ? null : '${person.score}% fit');
+    final meta = [
+      if (person.role != null) optionLabel(person.role!),
+      if (show.contains('experience') && person.experienceLevel != null)
+        optionLabel(person.experienceLevel!),
+      if (show.contains('schedule') && person.schedule != null)
+        optionLabel(person.schedule!),
+    ].join(' · ');
+    final chips = <Widget>[
+      if (show.contains('superpowers'))
+        for (final p in person.superpowers)
+          InfoTag(optionLabel(p), color: accent, textColor: onAccent),
+      if (show.contains('skills'))
+        for (final s in person.skills) _OutlineChip(s),
+      if (show.contains('interests'))
+        for (final i in person.interests)
+          InfoTag(optionLabel(i), color: Palette.strip, textColor: Palette.ink),
+    ].take(6).toList();
+
+    return Semantics(
+      label: position.isEmpty ? null : 'Card $position',
+      child: Container(
+        decoration: const BoxDecoration(
           color: Palette.window,
           borderRadius: Frame.radius,
           border: Frame.border,
@@ -25,110 +59,226 @@ class ProfileCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(child: _Photo(person: person)),
-            _About(person: person),
-          ],
-        ),
-      );
-}
-
-class _Photo extends StatelessWidget {
-  const _Photo({required this.person});
-
-  final User person;
-
-  @override
-  Widget build(BuildContext context) => ColoredBox(
-        color: Palette.pink,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final size = (constraints.maxHeight - 40).clamp(72.0, 128.0);
-            return Stack(
-              children: [
-                Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(3),
-                    decoration: const BoxDecoration(color: Palette.gold, shape: BoxShape.circle),
-                    child: Avatar(url: person.avatar, name: person.name, size: size),
-                  ),
-                ),
-                if (person.score case final score?)
-                  Positioned(top: 14, left: 14, child: _FitTag(score)),
-              ],
-            );
-          },
-        ),
-      );
-}
-
-class _FitTag extends StatelessWidget {
-  const _FitTag(this.score);
-
-  final int score;
-
-  @override
-  Widget build(BuildContext context) => Pulse(
-        minScale: 0.96,
-        period: const Duration(milliseconds: 1400),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: const BoxDecoration(color: Palette.crimson, borderRadius: Frame.chipRadius),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            spacing: 6,
-            children: [
-              const Icon(Icons.bolt_rounded, size: 16, color: Palette.onCrimson),
-              Text('$score% fit', style: AppType.body(size: 14, weight: FontWeight.w700, color: Palette.onCrimson)),
-            ],
-          ),
-        ),
-      );
-}
-
-class _About extends StatelessWidget {
-  const _About({required this.person});
-
-  final User person;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          spacing: 10,
-          children: [
-            Rise(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                spacing: 2,
-                children: [
-                  Text(person.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.title(size: 24)),
-                  Text(personMeta(person), maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.body(size: 14, color: Palette.muted)),
-                ],
-              ),
+            Expanded(
+              child: _Cover(person: person, fit: fit),
             ),
-            if (person.tags.isNotEmpty)
-              Rise(
-                delay: const Duration(milliseconds: 80),
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [for (final tag in person.tags.take(2)) InfoTag(tag, icon: Icons.check_rounded)],
-                ),
-              ),
-            if (person.superpowers.isNotEmpty)
-              Rise(
-                delay: const Duration(milliseconds: 160),
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
+            // The photo sits half over the cover; the row itself is only as
+            // tall as the name, so nothing below gets pushed down.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 0, 18, 0),
+              child: SizedBox(
+                height: 50,
+                child: Stack(
+                  clipBehavior: Clip.none,
                   children: [
-                    for (final power in person.superpowers)
-                      InfoTag(optionLabel(power), color: Palette.navy, textColor: Palette.cream),
+                    Positioned(
+                      left: 0,
+                      bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: accent,
+                          border: Border.all(color: Palette.window, width: 4),
+                        ),
+                        child: Avatar(
+                          url: person.avatar,
+                          name: person.name,
+                          size: 74,
+                          background: accent,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 102,
+                      right: 0,
+                      bottom: 2,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        spacing: 2,
+                        children: [
+                          Text(
+                            person.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppType.title(size: 22),
+                          ),
+                          if (meta.isNotEmpty)
+                            Text(
+                              meta,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppType.body(
+                                size: 14,
+                                color: Palette.muted,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: 8,
+                children: [
+                  if (person.tags.isNotEmpty)
+                    Rise(
+                      delay: const Duration(milliseconds: 80),
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          for (final tag in person.tags.take(2))
+                            InfoTag(tag, icon: Icons.check_rounded),
+                        ],
+                      ),
+                    ),
+                  if (chips.isNotEmpty)
+                    Rise(
+                      delay: const Duration(milliseconds: 160),
+                      child: Wrap(spacing: 6, runSpacing: 6, children: chips),
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The cover, with the fit tag on top and the headline over a soft fade.
+class _Cover extends StatelessWidget {
+  const _Cover({required this.person, required this.fit});
+
+  final User person;
+  final String? fit;
+
+  @override
+  Widget build(BuildContext context) {
+    final headline = person.headline.isNotEmpty
+        ? person.headline
+        : (person.bio.isNotEmpty ? person.bio : null);
+    return DecoratedBox(
+      decoration: CardStyle.cover(person.cover, photoUrl: person.coverUrl),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (person.cover == 'circuit')
+            const CustomPaint(painter: _CircuitPainter()),
+          if (headline != null)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: DecoratedBox(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0x00000000), Color(0x9E0A0603)],
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 36, 18, 50),
+                  child: Text(
+                    headline,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppType.body(
+                      size: 17,
+                      weight: FontWeight.w500,
+                      height: 1.3,
+                      color: const Color(0xFFFFF6E0),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (fit != null) Positioned(top: 14, left: 14, child: _FitTag(fit!)),
+        ],
+      ),
+    );
+  }
+}
+
+class _FitTag extends StatelessWidget {
+  const _FitTag(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Pulse(
+    minScale: 0.96,
+    period: const Duration(milliseconds: 1400),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: const BoxDecoration(
+        color: Palette.crimson,
+        borderRadius: Frame.chipRadius,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        spacing: 6,
+        children: [
+          const Icon(Icons.bolt_rounded, size: 16, color: Palette.onCrimson),
+          Text(
+            label,
+            style: AppType.body(
+              size: 14,
+              weight: FontWeight.w700,
+              color: Palette.onCrimson,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _OutlineChip extends StatelessWidget {
+  const _OutlineChip(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      borderRadius: Frame.tagRadius,
+      border: Border.all(color: Palette.dashed),
+    ),
+    child: Text(
+      text,
+      style: AppType.body(size: 13, weight: FontWeight.w500, height: 1.2),
+    ),
+  );
+}
+
+/// Thin gold diagonals for the Circuit cover.
+class _CircuitPainter extends CustomPainter {
+  const _CircuitPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0x38E8C25E)
+      ..strokeWidth = 2;
+    for (var x = -size.height; x < size.width; x += 16) {
+      canvas.drawLine(
+        Offset(x, size.height),
+        Offset(x + size.height, 0),
+        paint,
       );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

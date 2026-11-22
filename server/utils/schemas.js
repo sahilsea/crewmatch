@@ -2,19 +2,38 @@ import { z } from 'zod';
 import mongoose from 'mongoose';
 import {
   OPTIONS, MAX_SUPERPOWERS, MAX_CREW_SIZE, EVENT_KINDS, EVENT_CATEGORIES,
+  CARD_COVERS, CARD_ACCENTS, CARD_FIELDS,
 } from '../config/options.js';
 
 const objectId = z.string().refine((v) => mongoose.isValidObjectId(v), 'Invalid id');
 
+// Letters, spaces and the usual name punctuation; at least two letters.
+const personName = z
+  .string()
+  .trim()
+  .min(2, 'Enter your full name')
+  .max(60, 'Names can be up to 60 characters')
+  .regex(/^[\p{L}][\p{L}\p{M} .'-]*$/u, 'Use letters only in your name');
+
+// At least 8 characters with a letter and a number.
+export const passwordRule = z
+  .string()
+  .min(8, 'Use at least 8 characters')
+  .max(100, 'Passwords can be up to 100 characters')
+  .regex(/[A-Za-z]/, 'Add at least one letter')
+  .regex(/\d/, 'Add at least one number');
+
 export const registerSchema = z.object({
-  name: z.string().trim().min(2).max(60),
-  email: z.email().toLowerCase(),
-  password: z.string().min(6).max(100),
+  name: personName,
+  email: z.email('Enter a valid email address').trim().toLowerCase().max(120),
+  password: passwordRule,
 });
 
+export const verifySchema = z.object({ code: z.string().trim().regex(/^\d{6}$/, 'Enter the 6-digit code') });
+
 export const loginSchema = z.object({
-  email: z.email().toLowerCase(),
-  password: z.string().min(1),
+  email: z.email('Enter a valid email address').trim().toLowerCase(),
+  password: z.string().min(1, 'Enter your password'),
 });
 
 // Every field is optional so web and mobile can save partial edits.
@@ -31,6 +50,10 @@ export const profileSchema = z
     interests: z.array(z.enum(OPTIONS.interests)).min(1).max(OPTIONS.interests.length),
     superpowers: z.array(z.enum(OPTIONS.superpowers)).max(MAX_SUPERPOWERS),
     skills: z.array(z.string().trim().min(1).max(30)).max(15),
+    headline: z.string().trim().max(80),
+    cover: z.enum(CARD_COVERS),
+    accent: z.enum(CARD_ACCENTS),
+    cardFields: z.array(z.enum(CARD_FIELDS)).max(CARD_FIELDS.length),
   })
   .partial()
   .strict();
@@ -56,7 +79,17 @@ export const createPostSchema = z.object({
 
 export const commentSchema = z.object({ text: z.string().trim().min(1).max(300) });
 
-export const messageSchema = z.object({ text: z.string().trim().min(1).max(1000) });
+// A chat line: text, a photo, a document, or text with one of them.
+export const messageSchema = z
+  .object({
+    text: z.string().trim().max(1000).optional().default(''),
+    photo: z.string().max(4_500_000).optional(),
+    file: z.object({ name: z.string().trim().min(1).max(120), data: z.string().max(14_000_000) }).optional(),
+  })
+  .refine((m) => m.text.length > 0 || m.photo || m.file, 'Write a message or attach something')
+  .refine((m) => !(m.photo && m.file), 'Attach a photo or a file, not both');
+
+export const photoUploadSchema = z.object({ photo: z.string().min(1).max(4_500_000) });
 
 // ISO date strings (or epoch milliseconds) from the admin form.
 const date = z.union([z.string(), z.number()]).pipe(z.coerce.date({ error: 'Invalid date' }));

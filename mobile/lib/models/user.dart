@@ -28,6 +28,12 @@ class User {
     this.score,
     this.tags = const [],
     this.inCrew = false,
+    this.emailVerified = true,
+    this.headline = '',
+    this.cover = 'dusk',
+    this.coverUrl,
+    this.accent = 'crimson',
+    this.cardFields = const ['superpowers', 'skills', 'experience'],
   });
 
   factory User.fromJson(Map<String, dynamic> json) => User(
@@ -51,6 +57,12 @@ class User {
         score: intOrNull(json['score']),
         tags: stringList(json['tags']),
         inCrew: json['inCrew'] as bool? ?? false,
+        emailVerified: json['emailVerified'] as bool? ?? true,
+        headline: json['headline'] as String? ?? '',
+        cover: json['cover'] as String? ?? 'dusk',
+        coverUrl: json['coverUrl'] as String?,
+        accent: json['accent'] as String? ?? 'crimson',
+        cardFields: json['cardFields'] == null ? const ['superpowers', 'skills', 'experience'] : stringList(json['cardFields']),
       );
 
   static List<User> listFrom(Object? json) =>
@@ -84,7 +96,28 @@ class User {
   /// Already in some crew (matches only).
   final bool inCrew;
 
-  User copyWith({bool? inCrew, int? matchCount}) => User(
+  /// Your own account only: new accounts confirm their email with a code.
+  final bool emailVerified;
+
+  /// The swipe card: a line over the cover, which cover, the accent colour
+  /// and which details show. See `ui/card_style.dart`.
+  final String headline;
+  final String cover;
+
+  /// The uploaded cover photo, when [cover] is `photo`.
+  final String? coverUrl;
+  final String accent;
+  final List<String> cardFields;
+
+  User copyWith({
+    bool? inCrew,
+    int? matchCount,
+    String? headline,
+    String? cover,
+    String? accent,
+    List<String>? cardFields,
+  }) =>
+      User(
         id: id,
         name: name,
         avatar: avatar,
@@ -105,5 +138,11 @@ class User {
         score: score,
         tags: tags,
         inCrew: inCrew ?? this.inCrew,
+        emailVerified: emailVerified,
+        headline: headline ?? this.headline,
+        cover: cover ?? this.cover,
+        coverUrl: coverUrl,
+        accent: accent ?? this.accent,
+        cardFields: cardFields ?? this.cardFields,
       );
 }

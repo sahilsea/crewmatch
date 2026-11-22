@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../state/appearance.dart';
 import '../../state/session.dart';
 import '../../ui/ui.dart';
+import '../profile/card_editor_screen.dart';
 import '../profile/profile_screen.dart';
 
 /// The header across the top: logo, CrewMatch, and a slot on the right.
@@ -61,6 +62,18 @@ class MenuBarText extends StatelessWidget {
   );
 }
 
+/// Asks first, then signs out and goes back to the sign-in screen.
+Future<void> confirmSignOut(BuildContext context) async {
+  final session = context.session;
+  final yes = await confirmAction(
+    context,
+    title: 'Log out',
+    message: 'Log out of CrewMatch on this device?',
+    confirmLabel: 'Log out',
+  );
+  if (yes) await session.signOut(notice: 'You have logged out.');
+}
+
 /// A LOG OUT button for the header.
 class LogOutButton extends StatelessWidget {
   const LogOutButton({super.key});
@@ -69,13 +82,13 @@ class LogOutButton extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(right: 8),
     child: TextButton(
-      onPressed: () => context.session.signOut(),
+      onPressed: () => confirmSignOut(context),
       child: const Text('Log out'),
     ),
   );
 }
 
-enum _AccountAction { profile, light, dark, system, signOut }
+enum _AccountAction { card, profile, light, dark, system, signOut }
 
 /// The avatar on the right of the menu bar, opening Profile / Log out.
 class AccountMenu extends StatelessWidget {
@@ -90,6 +103,8 @@ class AccountMenu extends StatelessWidget {
       offset: const Offset(0, 6),
       onSelected: (action) {
         switch (action) {
+          case _AccountAction.card:
+            Navigator.of(context).push(CardEditorScreen.route());
           case _AccountAction.profile:
             Navigator.of(context).push(ProfileScreen.route());
           case _AccountAction.light:
@@ -99,19 +114,29 @@ class AccountMenu extends StatelessWidget {
           case _AccountAction.system:
             Appearance.instance.choose(ThemeMode.system);
           case _AccountAction.signOut:
-            context.session.signOut();
+            confirmSignOut(context);
         }
       },
       itemBuilder: (context) {
         final mode = Appearance.instance.value;
         return [
+          const PopupMenuItem(value: _AccountAction.card, child: Text('Your card')),
           const PopupMenuItem(value: _AccountAction.profile, child: Text('Profile')),
           const PopupMenuDivider(),
           CheckedPopupMenuItem(value: _AccountAction.light, checked: mode == ThemeMode.light, child: const Text('Light')),
           CheckedPopupMenuItem(value: _AccountAction.dark, checked: mode == ThemeMode.dark, child: const Text('Dark')),
           CheckedPopupMenuItem(value: _AccountAction.system, checked: mode == ThemeMode.system, child: const Text('Match phone')),
           const PopupMenuDivider(),
-          const PopupMenuItem(value: _AccountAction.signOut, child: Text('Log out')),
+          PopupMenuItem(
+            value: _AccountAction.signOut,
+            child: Row(
+              spacing: 10,
+              children: [
+                const Icon(Icons.logout_rounded, size: 20, color: Palette.danger),
+                Text('Log out', style: AppType.body(size: 15, color: Palette.danger)),
+              ],
+            ),
+          ),
         ];
       },
       child: SizedBox(

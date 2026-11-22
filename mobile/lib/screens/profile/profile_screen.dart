@@ -253,6 +253,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onRemove: (skill) => _edit(() => _skills.remove(skill)),
                 ),
                 if (_formError != null) ErrorNote(_formError!),
+                // Easy to find: the account's own page ends with Log out.
+                if (!widget.firstTime) ...[
+                  const Divider(),
+                  OutlinedButton.icon(
+                    onPressed: () => confirmSignOut(context),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Palette.danger,
+                      side: const BorderSide(color: Palette.danger),
+                      minimumSize: const Size(0, 52),
+                    ),
+                    icon: const Icon(Icons.logout_rounded),
+                    label: const Text('Log out'),
+                  ),
+                ],
               ],
             ),
           ),

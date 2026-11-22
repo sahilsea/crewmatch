@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -34,8 +35,9 @@ class ApiClient {
 
   Future<Map<String, dynamic>> get(String path) => send('GET', path);
 
-  Future<Map<String, dynamic>> post(String path, [Map<String, Object?>? body]) =>
-      send('POST', path, body ?? const {});
+  /// [timeout] overrides the default for slow calls such as uploads.
+  Future<Map<String, dynamic>> post(String path, [Map<String, Object?>? body, Duration? timeout]) =>
+      send('POST', path, body ?? const {}, timeout);
 
   Future<Map<String, dynamic>> put(String path, Map<String, Object?> body) =>
       send('PUT', path, body);
@@ -45,10 +47,29 @@ class ApiClient {
 
   Future<Map<String, dynamic>> delete(String path) => send('DELETE', path);
 
+  /// Raw bytes from a signed-in GET, e.g. a document from the crew chat.
+  /// [path] may include the `/api` prefix, as file URLs from the API do.
+  Future<Uint8List> getBytes(String path) async {
+    final url = path.startsWith('/api/') ? resolve(path) : '$baseUrl$path';
+    final request = http.Request('GET', Uri.parse(url));
+    final token = this.token;
+    if (token != null) request.headers['Authorization'] = 'Bearer $token';
+    final http.Response response;
+    try {
+      response = await _http.send(request).then(http.Response.fromStream).timeout(const Duration(seconds: 60));
+    } on Exception {
+      throw ApiException(0, "Can't reach the server at $baseUrl. Is the API running?");
+    }
+    if (response.statusCode >= 200 && response.statusCode < 300) return response.bodyBytes;
+    if (response.statusCode == 401 && token != null) onUnauthorized?.call();
+    throw ApiException.fromBody(response.statusCode, _decode(response));
+  }
+
   Future<Map<String, dynamic>> send(
     String method,
     String path, [
     Map<String, Object?>? body,
+    Duration? timeout,
   ]) async {
     final request = http.Request(method, Uri.parse('$baseUrl$path'))
       ..headers['Accept'] = 'application/json';
@@ -64,7 +85,7 @@ class ApiClient {
       response = await _http
           .send(request)
           .then(http.Response.fromStream)
-          .timeout(timeout);
+          .timeout(timeout ?? this.timeout);
     } on Exception {
       throw ApiException(
         0,

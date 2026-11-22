@@ -23,6 +23,11 @@ class CrewMatchApi {
         await client.post('/auth/login', {'email': email, 'password': password}),
       );
 
+  Future<User> verifyEmail(String code) async => _user(await client.post('/auth/verify', {'code': code}));
+
+  /// Sends a fresh code. Returns it when the server has no email set up.
+  Future<String?> resendCode() async => (await client.post('/auth/resend'))['devCode'] as String?;
+
   Future<AuthResult> register(String name, String email, String password) async =>
       AuthResult.fromJson(
         await client.post(
@@ -39,6 +44,26 @@ class CrewMatchApi {
   /// Partial update: send only the fields that changed or were filled in.
   Future<User> updateProfile(Map<String, Object?> changes) async =>
       _user(await client.put('/users/me', changes));
+
+  /// [photo] is a `data:image/…;base64,` URL.
+  Future<User> uploadAvatar(String photo) async =>
+      _user(await client.post('/users/me/avatar', {'photo': photo}, const Duration(seconds: 60)));
+
+  Future<User> removeAvatar() async => _user(await client.delete('/users/me/avatar'));
+
+  /// Also switches the card's cover to the photo.
+  Future<User> uploadCover(String photo) async =>
+      _user(await client.post('/users/me/cover', {'photo': photo}, const Duration(seconds: 60)));
+
+  Future<User> removeCover() async => _user(await client.delete('/users/me/cover'));
+
+  Future<List<Post>> userPosts(String userId) async =>
+      PostPage.fromJson(await client.get('/users/${Uri.encodeComponent(userId)}/posts')).posts;
+
+  Future<List<ActivityItem>> activity(String userId) async => [
+        for (final a in objectList((await client.get('/users/${Uri.encodeComponent(userId)}/activity'))['activity']))
+          ActivityItem.fromJson(a),
+      ];
 
   // Deck and matches
 
@@ -169,8 +194,20 @@ class CrewMatchApi {
           ChatMessage.fromJson(m),
       ];
 
-  Future<ChatMessage> sendMessage(String text) async =>
-      ChatMessage.fromJson((await client.post('/crews/mine/messages', {'text': text}))['message'] as Map<String, dynamic>);
+  /// Text, and optionally a photo or a file as `data:` URLs.
+  Future<ChatMessage> sendMessage(String text, {String? photo, ({String name, String data})? file}) async =>
+      ChatMessage.fromJson((await client.post(
+        '/crews/mine/messages',
+        {
+          'text': text,
+          'photo': ?photo,
+          if (file != null) 'file': {'name': file.name, 'data': file.data},
+        },
+        const Duration(seconds: 90),
+      ))['message'] as Map<String, dynamic>);
+
+  /// A document from the crew chat, downloaded with your sign-in.
+  Future<List<int>> downloadFile(String url) => client.getBytes(url);
 
   static Post _post(Map<String, dynamic> json) => Post.fromJson(json['post'] as Map<String, dynamic>);
 

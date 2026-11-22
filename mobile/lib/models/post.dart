@@ -127,13 +127,14 @@ class PostPage {
 
 /// One line in the crew chat. System lines have no author.
 class ChatMessage {
-  const ChatMessage({required this.id, required this.text, required this.createdAt, this.author, this.system = false});
+  const ChatMessage({required this.id, required this.text, required this.createdAt, this.author, this.system = false, this.attachment});
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
         id: json['id'] as String,
         text: json['text'] as String? ?? '',
         system: json['kind'] == 'system',
         author: json['author'] is Map<String, dynamic> ? Author.fromJson(json['author'] as Map<String, dynamic>) : null,
+        attachment: json['attachment'] is Map<String, dynamic> ? Attachment.fromJson(json['attachment'] as Map<String, dynamic>) : null,
         createdAt: dateOrNull(json['createdAt']) ?? DateTime.now(),
       );
 
@@ -141,5 +142,52 @@ class ChatMessage {
   final String text;
   final bool system;
   final Author? author;
+  final Attachment? attachment;
   final DateTime createdAt;
+}
+
+/// A photo or document sent in the crew chat.
+class Attachment {
+  const Attachment({required this.photo, required this.url, required this.name, this.type = '', this.size = 0});
+
+  factory Attachment.fromJson(Map<String, dynamic> json) => Attachment(
+        photo: json['kind'] == 'photo',
+        url: json['url'] as String? ?? '',
+        name: json['name'] as String? ?? 'File',
+        type: json['type'] as String? ?? '',
+        size: intOr(json['size']),
+      );
+
+  final bool photo;
+
+  /// A server path: photos load like any image, files need your sign-in.
+  final String url;
+  final String name;
+  final String type;
+  final int size;
+
+  /// "PDF · 2.4 MB"
+  String get summary {
+    final ext = name.contains('.') ? name.split('.').last.toUpperCase() : 'File';
+    final kb = size / 1024;
+    return '$ext · ${kb >= 1024 ? '${(kb / 1024).toStringAsFixed(1)} MB' : '${kb.ceil()} KB'}';
+  }
+}
+
+/// One thing someone did at the hackathon (`GET /users/:id/activity`).
+class ActivityItem {
+  const ActivityItem({required this.kind, required this.text, this.at});
+
+  factory ActivityItem.fromJson(Map<String, dynamic> json) => ActivityItem(
+        kind: json['kind'] as String? ?? '',
+        text: json['text'] as String? ?? '',
+        at: dateOrNull(json['at']),
+      );
+
+  /// `post`, `crew`, `points` or `match`.
+  final String kind;
+  final String text;
+
+  /// When; matches have no date.
+  final DateTime? at;
 }

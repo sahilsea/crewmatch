@@ -30,6 +30,12 @@ export function adminOnly(req, res, next) {
   next();
 }
 
+// Everything except signing in, verifying and leaving needs a verified email.
+export function verifiedRequired(req, res, next) {
+  if (!req.user.emailVerified && !req.user.isAdmin) throw new HttpError(403, 'Verify your email first');
+  next();
+}
+
 // The swipe deck needs a finished profile to score against.
 export function profileRequired(req, res, next) {
   if (!req.user.profileComplete) throw new HttpError(409, 'Finish your profile first');

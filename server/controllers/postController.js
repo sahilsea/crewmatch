@@ -3,10 +3,9 @@ import Post from '../models/Post.js';
 import Photo from '../models/Photo.js';
 import Crew from '../models/Crew.js';
 import { HttpError } from '../middleware/error.js';
+import { decodeDataUrl } from '../utils/uploads.js';
 
 const PAGE = 20;
-const MAX_PHOTO_BYTES = 3 * 1024 * 1024;
-const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const AUTHOR_FIELDS = 'name avatar role';
 
 const person = (u) => (u ? { id: u.id, name: u.name, avatar: u.avatar, role: u.role ?? null } : null);
@@ -39,14 +38,6 @@ async function findPost(id) {
   return post;
 }
 
-// "data:image/jpeg;base64,...." → { type, data }.
-function decodePhoto(dataUrl) {
-  const match = /^data:(image\/[a-z]+);base64,([A-Za-z0-9+/=\s]+)$/.exec(dataUrl);
-  if (!match || !PHOTO_TYPES.includes(match[1])) throw new HttpError(400, 'Photos must be JPEG, PNG or WebP');
-  const data = Buffer.from(match[2], 'base64');
-  if (data.length > MAX_PHOTO_BYTES) throw new HttpError(413, 'Photos can be up to 3 MB');
-  return { type: match[1], data };
-}
 
 // GET /api/posts?before=<ISO date> — newest first, 20 at a time.
 export async function listPosts(req, res) {
@@ -60,12 +51,23 @@ export async function listPosts(req, res) {
   res.json({ posts: posts.map((p) => postView(p, req.user)), hasMore: posts.length === PAGE });
 }
 
+// GET /api/users/:id/posts — one person's posts, newest first.
+export async function listUserPosts(req, res) {
+  if (!mongoose.isValidObjectId(req.params.id)) throw new HttpError(404, 'User not found');
+  const posts = await Post.find({ author: req.params.id })
+    .sort({ createdAt: -1 })
+    .limit(PAGE)
+    .populate('author', AUTHOR_FIELDS)
+    .populate('comments.author', AUTHOR_FIELDS);
+  res.json({ posts: posts.map((p) => postView(p, req.user)) });
+}
+
 // POST /api/posts  { text, tag?, photo? (data URL) }
 export async function createPost(req, res) {
   const crew = req.user.crew ? await Crew.findById(req.user.crew, 'name') : null;
   let photo = null;
   if (req.body.photo) {
-    const { type, data } = decodePhoto(req.body.photo);
+    const { type, data } = decodeDataUrl(req.body.photo);
     photo = (await Photo.create({ owner: req.user._id, type, data }))._id;
   }
   const post = await Post.create({

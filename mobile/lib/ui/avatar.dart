@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../models/user.dart';
+import 'media.dart';
 import 'palette.dart';
 import 'type.dart';
 
@@ -43,7 +44,7 @@ class Avatar extends StatelessWidget {
         child: url.isEmpty
             ? initials
             : Image.network(
-                url,
+                mediaUrl(url),
                 fit: BoxFit.cover,
                 gaplessPlayback: true,
                 excludeFromSemantics: true,

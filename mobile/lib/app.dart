@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'screens/admin/admin_notice_screen.dart';
 import 'screens/auth/sign_in_screen.dart';
+import 'screens/auth/verify_email_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/shell/home_shell.dart';
 import 'state/appearance.dart';
@@ -81,16 +82,8 @@ class _CrewMatchAppState extends State<CrewMatchApp> with WidgetsBindingObserver
           debugShowCheckedModeBanner: false,
           theme: buildTheme(),
           scrollBehavior: const AppScrollBehavior(),
-          // Phone-shaped on a wide browser window, with the page colour around it.
-          builder: (context, child) => ColoredBox(
-            color: Palette.desktop,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 560),
-                child: child,
-              ),
-            ),
-          ),
+          // Screens adapt to the window themselves (see WindowSize).
+          builder: (context, child) => ColoredBox(color: Palette.desktop, child: child),
           home: const _RootGate(),
         ),
       );
@@ -107,6 +100,7 @@ class _RootGate extends StatelessWidget {
     if (session.restoring) return const Scaffold(body: LoadingView(message: 'Starting up…'));
     if (user == null) return const SignInScreen();
     if (user.isAdmin) return const AdminNoticeScreen();
+    if (!user.emailVerified) return const VerifyEmailScreen();
     if (!user.profileComplete) return const ProfileScreen(firstTime: true);
     return const HomeShell();
   }

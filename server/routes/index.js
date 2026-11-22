@@ -1,13 +1,15 @@
 import { Router } from 'express';
-import { protect, adminOnly, profileRequired } from '../middleware/auth.js';
+import { protect, adminOnly, profileRequired, verifiedRequired } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import {
   registerSchema, loginSchema, profileSchema, swipeSchema, createCrewSchema, addMemberSchema,
   eventInputSchema, checkinSchema, submitSchema, approveSchema, rejectSchema,
-  createPostSchema, commentSchema, messageSchema,
+  createPostSchema, commentSchema, messageSchema, photoUploadSchema, verifySchema,
 } from '../utils/schemas.js';
-import { register, login, me } from '../controllers/authController.js';
-import { getOptions, updateProfile, getUser, deleteAccount } from '../controllers/userController.js';
+import { register, login, me, verifyEmail, resendCode } from '../controllers/authController.js';
+import {
+  getOptions, updateProfile, getUser, deleteAccount, uploadAvatar, removeAvatar, uploadCover, removeCover, getActivity,
+} from '../controllers/userController.js';
 import { getDeck, swipe, resetPasses } from '../controllers/deckController.js';
 import { getMatches, unmatch } from '../controllers/matchController.js';
 import { createCrew, getMyCrew, addMember, removeMember, renameCrew, leaveCrew } from '../controllers/crewController.js';
@@ -18,9 +20,9 @@ import {
 import { getStats, listUsers } from '../controllers/adminController.js';
 import { listHackathons, getHackathonLeaderboard } from '../controllers/hackathonController.js';
 import {
-  listPosts, createPost, deletePost, toggleLike, listComments, addComment, getPhoto,
+  listPosts, listUserPosts, createPost, deletePost, toggleLike, listComments, addComment, getPhoto,
 } from '../controllers/postController.js';
-import { listMessages, sendMessage } from '../controllers/chatController.js';
+import { listMessages, sendMessage, getFile } from '../controllers/chatController.js';
 
 const router = Router();
 
@@ -36,10 +38,21 @@ router.get('/photos/:id', getPhoto);
 router.use(protect);
 
 router.get('/auth/me', me);
+router.post('/auth/verify', validate(verifySchema), verifyEmail);
+router.post('/auth/resend', resendCode);
+router.delete('/users/me', deleteAccount);
+
+// Everything below also needs a verified email
+router.use(verifiedRequired);
 
 router.put('/users/me', validate(profileSchema), updateProfile);
-router.delete('/users/me', deleteAccount);
+router.post('/users/me/avatar', validate(photoUploadSchema), uploadAvatar);
+router.delete('/users/me/avatar', removeAvatar);
+router.post('/users/me/cover', validate(photoUploadSchema), uploadCover);
+router.delete('/users/me/cover', removeCover);
 router.get('/users/:id', getUser);
+router.get('/users/:id/posts', listUserPosts);
+router.get('/users/:id/activity', getActivity);
 
 router.get('/deck', profileRequired, getDeck);
 router.post('/swipe', profileRequired, validate(swipeSchema), swipe);
@@ -55,6 +68,7 @@ router.post('/crews/mine/members', validate(addMemberSchema), addMember);
 router.delete('/crews/mine/members/:userId', removeMember);
 router.get('/crews/mine/messages', listMessages);
 router.post('/crews/mine/messages', validate(messageSchema), sendMessage);
+router.get('/crews/mine/files/:id', getFile);
 
 // Hackathon feed
 router.get('/posts', listPosts);

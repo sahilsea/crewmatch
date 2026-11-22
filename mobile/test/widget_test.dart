@@ -88,12 +88,73 @@ void main() {
     );
     await pumpApp(tester, session);
 
-    await tester.enterText(find.byType(TextField).at(0), 'not-an-email');
+    await tester.enterText(find.byType(TextField).at(0), 'taken@college.edu');
+    await tester.enterText(find.byType(TextField).at(1), 'whatever1');
     await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
     await tester.pumpAndSettle();
 
     expect(find.text('Invalid email address'), findsOneWidget);
     expect(session.user, isNull);
+  });
+
+  testWidgets('sign-up checks the fields before sending anything', (tester) async {
+    var calls = 0;
+    final session = Session(
+      api: fakeApi({
+        'POST /auth/register': (_) {
+          calls++;
+          return (201, <String, Object?>{});
+        },
+      }),
+      tokens: MemoryTokenStore(),
+    );
+    await pumpApp(tester, session);
+    await tester.tap(find.text('Create an account'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).at(0), 'R2');
+    await tester.enterText(find.byType(TextField).at(1), 'nope');
+    await tester.enterText(find.byType(TextField).at(2), 'short');
+    await tester.tap(find.widgetWithText(FilledButton, 'Create account'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Use letters only in your name'), findsOneWidget);
+    expect(find.text('Enter a valid email address'), findsOneWidget);
+    expect(find.text('Use at least 8 characters'), findsOneWidget);
+    expect(calls, 0, reason: 'nothing is sent while a field is wrong');
+  });
+
+  testWidgets('a new account lands on the verify screen until the code is right', (tester) async {
+    final session = Session(
+      api: fakeApi({
+        'POST /auth/register': (_) => (201, {'token': 'jwt', 'user': {...userJson(), 'emailVerified': false}, 'devCode': '424242'}),
+        'POST /auth/verify': (r) => r.body.contains('424242')
+            ? (200, {'user': {...userJson(), 'emailVerified': true}})
+            : (400, {'error': 'Wrong code. 4 tries left'}),
+        'GET /deck': (_) => (200, {'scoredAgainst': 'you', 'count': 0, 'deck': <Object>[]}),
+      }),
+      tokens: MemoryTokenStore(),
+    );
+    await pumpApp(tester, session);
+    await tester.tap(find.text('Create an account'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), 'Demo Mobile');
+    await tester.enterText(find.byType(TextField).at(1), 'demo@college.edu');
+    await tester.enterText(find.byType(TextField).at(2), 'secret123');
+    await tester.tap(find.widgetWithText(FilledButton, 'Create account'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Check your email'), findsOneWidget);
+    expect(find.textContaining('Your code is 424242'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), '111111');
+    await tester.pumpAndSettle();
+    expect(find.text('Wrong code. 4 tries left'), findsOneWidget);
+
+    await tester.tap(find.text('Use it'));
+    await tester.pumpAndSettle();
+    expect(find.text('Check your email'), findsNothing);
+    expect(session.user!.emailVerified, isTrue);
   });
 
   testWidgets('a sent-back challenge shows the reviewer note and lets the crew resubmit',

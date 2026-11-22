@@ -19,9 +19,12 @@ import 'start_crew_window.dart';
 /// Your crew of up to four: who's in it, what it covers, its hackathon score.
 /// Without a crew, a form to start one from your matches.
 class CrewScreen extends StatefulWidget {
-  const CrewScreen({super.key, required this.onOpen});
+  const CrewScreen({super.key, required this.onOpen, this.wide = false});
 
   final OpenTab onOpen;
+
+  /// Wide windows: the crew on the left, its chat open on the right.
+  final bool wide;
 
   @override
   State<CrewScreen> createState() => _CrewScreenState();
@@ -63,11 +66,20 @@ class _CrewScreenState extends State<CrewScreen> {
   Future<void> _loadChat(Crew crew) async {
     try {
       final me = context.session.user?.id;
-      final (messages, read) = await waitBoth(context.api.messages(), ChatRead.lastRead(crew.id));
+      final (messages, read) = await waitBoth(
+        context.api.messages(),
+        ChatRead.lastRead(crew.id),
+      );
       if (!mounted) return;
       setState(() {
         _lastMessage = messages.lastOrNull;
-        _unread = messages.where((m) => m.author?.id != me && (read == null || m.createdAt.isAfter(read))).length;
+        _unread = messages
+            .where(
+              (m) =>
+                  m.author?.id != me &&
+                  (read == null || m.createdAt.isAfter(read)),
+            )
+            .length;
       });
     } catch (_) {
       // The card just shows no preview.
@@ -95,15 +107,16 @@ class _CrewScreenState extends State<CrewScreen> {
   }
 
   Future<void> _add(User person) => _act(() async {
-        final crew = await context.api.addCrewMember(person.id);
-        if (!mounted) return;
-        setState(() {
-          _crew = crew;
-          _matches = [
-            for (final m in _matches) m.id == person.id ? m.copyWith(inCrew: true) : m,
-          ];
-        });
-      });
+    final crew = await context.api.addCrewMember(person.id);
+    if (!mounted) return;
+    setState(() {
+      _crew = crew;
+      _matches = [
+        for (final m in _matches)
+          m.id == person.id ? m.copyWith(inCrew: true) : m,
+      ];
+    });
+  });
 
   Future<void> _remove(User person) async {
     final confirmed = await confirmAction(
@@ -119,7 +132,8 @@ class _CrewScreenState extends State<CrewScreen> {
       setState(() {
         _crew = crew;
         _matches = [
-          for (final m in _matches) m.id == person.id ? m.copyWith(inCrew: false) : m,
+          for (final m in _matches)
+            m.id == person.id ? m.copyWith(inCrew: false) : m,
         ];
       });
     });
@@ -177,61 +191,86 @@ class _CrewScreenState extends State<CrewScreen> {
         if (!m.inCrew && !(crew?.hasMember(m.id) ?? false)) m,
     ];
 
-    return Column(
+    final chatBeside = widget.wide && crew != null;
+    final column = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ScreenHeader(
           title: crew == null ? 'Start a crew' : 'Your crew',
-          subtitle: crew == null ? null : '${crew.members.length} of ${Crew.maxSize}',
-          trailing: crew == null
+          subtitle: crew == null
+              ? null
+              : '${crew.members.length} of ${Crew.maxSize}',
+          trailing: crew == null || chatBeside
               ? null
               : IconButton(
-                  tooltip: _unread > 0 ? 'Crew chat, $_unread new' : 'Crew chat',
+                  tooltip: _unread > 0
+                      ? 'Crew chat, $_unread new'
+                      : 'Crew chat',
                   onPressed: () => _openChat(crew),
                   icon: Badge(
                     isLabelVisible: _unread > 0,
                     label: Text('$_unread'),
                     backgroundColor: Palette.crimson,
                     textColor: Palette.onCrimson,
-                    child: const Icon(Icons.chat_bubble_outline_rounded, color: Palette.ink),
+                    child: const Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      color: Palette.ink,
+                    ),
                   ),
                 ),
         ),
         Expanded(
           child: RefreshIndicator(
-      onRefresh: _load,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
-        children: [
-          if (crew == null)
-            StartCrewWindow(
-              matches: _matches,
-              onCreated: _created,
-              onFindPeople: () => widget.onOpen(AppTab.discover),
-            )
-          else ...[
-            CrewWindow(
-              crew: crew,
-              myId: me?.id,
-              onRename: () => _rename(crew),
-              onRemove: _remove,
-              chat: Rise(
-                delay: const Duration(milliseconds: 80),
-                child: _ChatCard(last: _lastMessage, unread: _unread, onTap: () => _openChat(crew)),
-              ),
-              onLeave: () => _leave(crew),
+            onRefresh: _load,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
+              children: [
+                if (crew == null)
+                  StartCrewWindow(
+                    matches: _matches,
+                    onCreated: _created,
+                    onFindPeople: () => widget.onOpen(AppTab.discover),
+                  )
+                else ...[
+                  CrewWindow(
+                    crew: crew,
+                    myId: me?.id,
+                    onRename: () => _rename(crew),
+                    onRemove: _remove,
+                    chat: chatBeside
+                        ? null
+                        : Rise(
+                            delay: const Duration(milliseconds: 80),
+                            child: _ChatCard(
+                              last: _lastMessage,
+                              unread: _unread,
+                              onTap: () => _openChat(crew),
+                            ),
+                          ),
+                    onLeave: () => _leave(crew),
+                  ),
+                  const SizedBox(height: 14),
+                  CoverageWindow(crew: crew),
+                  if (crew.spotsLeft > 0 && addable.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    AddMembersWindow(people: addable, onAdd: _add),
+                  ],
+                ],
+              ],
             ),
-            const SizedBox(height: 14),
-            CoverageWindow(crew: crew),
-            if (crew.spotsLeft > 0 && addable.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              AddMembersWindow(people: addable, onAdd: _add),
-            ],
-          ],
-        ],
-      ),
           ),
+        ),
+      ],
+    );
+    if (!chatBeside) return column;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(width: 440, child: column),
+        const VerticalDivider(width: 1),
+        Expanded(
+          child: ChatScreen(key: ValueKey(crew.id), crew: crew, embedded: true),
         ),
       ],
     );
@@ -240,7 +279,11 @@ class _CrewScreenState extends State<CrewScreen> {
 
 /// "Crew chat" with the latest line and an unread count; opens the chat.
 class _ChatCard extends StatelessWidget {
-  const _ChatCard({required this.last, required this.unread, required this.onTap});
+  const _ChatCard({
+    required this.last,
+    required this.unread,
+    required this.onTap,
+  });
 
   final ChatMessage? last;
   final int unread;
@@ -252,8 +295,8 @@ class _ChatCard extends StatelessWidget {
     final preview = last == null
         ? 'Only your crew can see it'
         : last.system
-            ? last.text
-            : '${last.author?.name.split(' ').first ?? 'Someone'}: ${last.text}';
+        ? last.text
+        : '${last.author?.name.split(' ').first ?? 'Someone'}: ${last.text}';
     return Material(
       color: Palette.strip,
       shape: const RoundedRectangleBorder(borderRadius: Frame.radius),
@@ -268,20 +311,38 @@ class _ChatCard extends StatelessWidget {
               Container(
                 width: 40,
                 height: 40,
-                decoration: const BoxDecoration(color: Palette.crimson, borderRadius: Frame.buttonRadius),
-                child: const Icon(Icons.chat_bubble_outline_rounded, size: 20, color: Palette.onCrimson),
+                decoration: const BoxDecoration(
+                  color: Palette.crimson,
+                  borderRadius: Frame.buttonRadius,
+                ),
+                child: const Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  size: 20,
+                  color: Palette.onCrimson,
+                ),
               ),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   spacing: 2,
                   children: [
-                    Text('Crew chat', style: AppType.body(size: 15, weight: FontWeight.w500)),
-                    Text(preview, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.body(size: 13, color: Palette.muted)),
+                    Text(
+                      'Crew chat',
+                      style: AppType.body(size: 15, weight: FontWeight.w500),
+                    ),
+                    Text(
+                      preview,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppType.body(size: 13, color: Palette.muted),
+                    ),
                   ],
                 ),
               ),
-              if (unread > 0) CountBadge(unread) else const Icon(Icons.chevron_right_rounded, color: Palette.muted),
+              if (unread > 0)
+                CountBadge(unread)
+              else
+                const Icon(Icons.chevron_right_rounded, color: Palette.muted),
             ],
           ),
         ),
