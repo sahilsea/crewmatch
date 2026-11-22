@@ -8,6 +8,6 @@ const apiUrl = String.fromEnvironment(
 );
 
 /// Where the web app lives. Profile links and QR codes point here, e.g.
-/// `https://crewmatch.netlify.app/u/tara-fernandes`. In the browser it's just
+/// `https://crewmatch10.netlify.app/u/tara-fernandes`. In the browser it's just
 /// the page's own address.
-const webUrl = String.fromEnvironment('WEB_URL', defaultValue: 'https://crewmatch.netlify.app');
+const webUrl = String.fromEnvironment('WEB_URL', defaultValue: 'https://crewmatch10.netlify.app');

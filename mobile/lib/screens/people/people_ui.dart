@@ -9,7 +9,7 @@ import '../../state/session.dart';
 import '../../ui/ui.dart';
 import '../../util/labels.dart';
 
-/// Someone's profile link: `https://crewmatch.netlify.app/u/tara-fernandes`.
+/// Someone's profile link: `https://crewmatch10.netlify.app/u/tara-fernandes`.
 /// In the browser it uses the page's own address.
 String profileLink(String handle) => '${kIsWeb ? Uri.base.origin : webUrl}/u/$handle';
 

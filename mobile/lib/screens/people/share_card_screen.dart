@@ -244,7 +244,7 @@ class _ShareCardScreenState extends State<ShareCardScreen> {
           LabeledField(
             label: 'Or paste a profile link',
             controller: _pasted,
-            hint: 'crewmatch.netlify.app/u/…',
+            hint: 'crewmatch10.netlify.app/u/…',
             keyboardType: TextInputType.url,
             onSubmitted: (v) => _openHandle(handleFromLink(v), RequestSource.link),
           ),
