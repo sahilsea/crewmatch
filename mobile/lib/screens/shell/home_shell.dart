@@ -1,4 +1,5 @@
 import '../../models/team_request.dart';
+import '../../state/app_update.dart';
 import '../../state/incoming_link.dart';
 import '../people/person_screen.dart';
 import 'package:material_ui/material_ui.dart';
@@ -13,6 +14,7 @@ import '../../ui/ui.dart';
 import 'dock.dart';
 import 'side_rail.dart';
 import 'top_menu_bar.dart';
+import 'update_dialog.dart';
 
 /// The signed-in app: menu bar on top, the current tab, the dock below.
 ///
@@ -38,6 +40,10 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
+    // A newer Android build on GitHub: offer it once per launch.
+    UpdateChecker.checkOnce().then((update) {
+      if (update != null && mounted) showUpdateDialog(context, update);
+    });
     // Opened from a profile link: show that person once you're in.
     final handle = IncomingLink.take();
     if (handle != null) {

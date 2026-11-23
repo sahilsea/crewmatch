@@ -19,10 +19,12 @@ dependencies:
   material_ui: ^1.8.0
   mobile_scanner: ^7.5.0
   open_filex: ^5.0.0
+  package_info_plus: ^10.2.2
   path_provider: ^2.1.6
   qr_flutter: ^4.1.0
   share_plus: ^13.3.1
   shared_preferences: ^2.5.6
+  url_launcher: ^6.3.3
 
 dev_dependencies:
   flutter_test:
