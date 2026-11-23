@@ -47,6 +47,7 @@ class User {
     this.isLead = false,
     this.breakdown,
     this.record,
+    this.demo = false,
   });
 
   factory User.fromJson(Map<String, dynamic> json) => User(
@@ -85,6 +86,7 @@ class User {
         isLead: json['isLead'] == true,
         breakdown: FitBreakdown.from(json['breakdown']),
         record: HackRecord.from(json['record']),
+        demo: json['demo'] == true,
       );
 
   static List<User> listFrom(Object? json) =>
@@ -158,6 +160,9 @@ class User {
   /// Deck cards: what their crew has finished.
   final HackRecord? record;
 
+  /// A sample account from the demo data.
+  final bool demo;
+
   User copyWith({
     Relation? relation,
     bool? inCrew,
@@ -203,6 +208,7 @@ class User {
         isLead: isLead,
         breakdown: breakdown,
         record: record,
+        demo: demo,
       );
 }
 

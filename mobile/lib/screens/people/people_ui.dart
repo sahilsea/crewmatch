@@ -167,6 +167,7 @@ class PersonRow extends StatelessWidget {
                         spacing: 6,
                         children: [
                           Flexible(child: Text(person.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.body(size: 15.5, weight: FontWeight.w500))),
+                          if (person.demo) const DemoBadge(small: true),
                           if (person.score case final score?) _FitPill(score),
                         ],
                       ),

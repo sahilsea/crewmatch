@@ -127,6 +127,7 @@ class _ClubScreenState extends State<ClubScreen> {
                                         children: [
                                           Flexible(child: Text(c.name, style: AppType.title(size: wide ? 30 : 22))),
                                           if (c.verified) VerifiedBadge(size: wide ? 22 : 18),
+                                          if (c.demo) const DemoBadge(),
                                         ],
                                       ),
                                       Text(

@@ -453,7 +453,7 @@ export const CLUBS = [
 ];
 
 async function seedClubs() {
-  const clubs = await Club.insertMany(CLUBS.map(([name, short, category, tone, verified, description]) => ({ name, short, category, tone, verified, description })));
+  const clubs = await Club.insertMany(CLUBS.map(([name, short, category, tone, verified, description]) => ({ name, short, category, tone, verified, description, demo: true })));
   const byName = Object.fromEntries(clubs.map((c) => [c.name, c]));
   const students = await User.find({ isAdmin: false }).sort({ name: 1 });
   // Everyone in one or two clubs, spread evenly; the demo accounts in Coding Club and Design Guild.
@@ -484,8 +484,10 @@ export async function addMockClubs() {
   const made = [];
   for (const [name, short, category, tone, verified, description] of CLUBS) {
     const exists = await Club.findOne({ name }).collation({ locale: 'en', strength: 2 });
-    if (!exists) made.push(await Club.create({ name, short, category, tone, verified, description }));
+    if (!exists) made.push(await Club.create({ name, short, category, tone, verified, description, demo: true }));
   }
+  // Clubs added by an older run of this script get their Demo badge too.
+  await Club.updateMany({ name: { $in: CLUBS.map(([n]) => n) } }, { $set: { demo: true } }).collation({ locale: 'en', strength: 2 });
   const clubs = await Club.find({ name: { $in: CLUBS.map(([n]) => n) } }).collation({ locale: 'en', strength: 2 });
   const students = await User.find({ email: /@students\.crewmatch\.dev$/, isAdmin: false, clubs: { $size: 0 } }).sort({ name: 1 });
   if (clubs.length) {

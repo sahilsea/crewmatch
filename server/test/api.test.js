@@ -1001,6 +1001,20 @@ describe('discover details', () => {
   });
 });
 
+describe('demo badges', () => {
+  test('seeded students and clubs are marked demo; real sign-ups are not', async () => {
+    const web = await login('web@crewmatch.dev');
+    const { deck } = (await api('GET', '/deck', { token: web })).body;
+    assert.ok(deck.length > 0 && deck.every((c) => c.demo === true));
+    assert.ok(deck.flatMap((c) => c.clubs).every((c) => c.demo === true));
+    const clubs = (await api('GET', '/clubs', { token: web })).body.clubs;
+    assert.ok(clubs.every((c) => c.demo === true));
+    const u = await newUser();
+    const me = (await api('GET', '/auth/me', { token: u.token })).body.user;
+    assert.equal(me.demo, false);
+  });
+});
+
 describe('CORS', () => {
   const allowOrigin = async (origin) =>
     (await api('GET', '/health', { headers: { origin } })).headers.get('access-control-allow-origin');

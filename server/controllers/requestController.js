@@ -112,7 +112,7 @@ export async function publicProfile(req, res) {
     user: {
       handle: pub.handle, name: pub.name, avatar: pub.avatar, headline: pub.headline, bio: pub.bio,
       role: pub.role, experienceLevel: pub.experienceLevel, skills: pub.skills, interests: pub.interests,
-      coverUrl: pub.coverUrl, cover: pub.cover, accent: pub.accent, inCrew: !!user.crew,
+      coverUrl: pub.coverUrl, cover: pub.cover, accent: pub.accent, inCrew: !!user.crew, demo: pub.demo,
     },
   });
 }
