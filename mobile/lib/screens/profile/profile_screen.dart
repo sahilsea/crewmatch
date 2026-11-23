@@ -28,6 +28,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   static const _single = ['role', 'experienceLevel', 'schedule', 'commitment', 'communication'];
   static const _maxSkills = 15;
 
+  /// The form stays a comfortable reading width on wide screens.
+  static const _maxWidth = 760.0;
+
   ProfileOptions? _options;
   Object? _loadError;
 
@@ -69,13 +72,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   static String? _answer(User user, String field) => switch (field) {
-        'role' => user.role,
-        'experienceLevel' => user.experienceLevel,
-        'schedule' => user.schedule,
-        'commitment' => user.commitment,
-        'communication' => user.communication,
-        _ => null,
-      };
+    'role' => user.role,
+    'experienceLevel' => user.experienceLevel,
+    'schedule' => user.schedule,
+    'commitment' => user.commitment,
+    'communication' => user.communication,
+    _ => null,
+  };
 
   Future<void> _loadOptions() async {
     try {
@@ -87,11 +90,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   List<String> get _missing => [
-        for (final field in _single)
-          if (_choices[field] == null) fieldLabels[field]!.toLowerCase(),
-        if (_interests.isEmpty) 'an interest',
-        if (_skills.isEmpty) 'a skill',
-      ];
+    for (final field in _single)
+      if (_choices[field] == null) fieldLabels[field]!.toLowerCase(),
+    if (_interests.isEmpty) 'an interest',
+    // Typed but not yet added still counts: saving adds it.
+    if (_skills.isEmpty && _skillText.text.trim().isEmpty) 'a skill',
+  ];
 
   int get _requiredCount => _single.length + 2;
 
@@ -99,23 +103,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   double get _progress => (_requiredCount - _missing.length) / _requiredCount;
 
   void _edit(VoidCallback change) => setState(() {
-        change();
-        _saved = false;
-      });
+    change();
+    _saved = false;
+  });
 
   void _toggle(List<String> list, String value) => _edit(() {
-        if (!list.remove(value)) list.add(value);
-      });
+    if (!list.remove(value)) list.add(value);
+  });
 
   void _addSkills(String text) => _edit(() {
-        for (final raw in text.split(',')) {
-          final skill = raw.trim();
-          final known = _skills.any((s) => s.toLowerCase() == skill.toLowerCase());
-          if (skill.isEmpty || known || _skills.length >= _maxSkills) continue;
-          _skills.add(skill.length > 30 ? skill.substring(0, 30) : skill);
-        }
-        _skillText.clear();
-      });
+    for (final raw in text.split(',')) {
+      final skill = raw.trim();
+      final known = _skills.any((s) => s.toLowerCase() == skill.toLowerCase());
+      if (skill.isEmpty || known || _skills.length >= _maxSkills) continue;
+      _skills.add(skill.length > 30 ? skill.substring(0, 30) : skill);
+    }
+    _skillText.clear();
+  });
 
   Future<void> _save() async {
     if (_skillText.text.trim().isNotEmpty) _addSkills(_skillText.text);
@@ -172,21 +176,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
               trailing: widget.firstTime ? const LogOutButton() : null,
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: ThinProgressBar(value: _progress, color: Palette.crimson),
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: _maxWidth),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: ThinProgressBar(value: _progress, color: Palette.crimson),
+                ),
+              ),
             ),
             Expanded(
               child: options == null
                   ? (_loadError == null
-                      ? const LoadingView()
-                      : ErrorView(
-                          error: _loadError!,
-                          onRetry: () {
-                            setState(() => _loadError = null);
-                            _loadOptions();
-                          },
-                        ))
+                        ? const LoadingView()
+                        : ErrorView(
+                            error: _loadError!,
+                            onRetry: () {
+                              setState(() => _loadError = null);
+                              _loadOptions();
+                            },
+                          ))
                   : _form(user, options),
             ),
             if (options != null) _saveBar(),
@@ -196,66 +205,100 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _form(User user, ProfileOptions options) => ListView(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 22, 16, 20),
+  Widget _form(User user, ProfileOptions options) {
+    Widget section(String title, String? subtitle, List<Widget> children, int i) => Rise(
+      delay: Motion.stagger(i),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+        decoration: const BoxDecoration(
+          color: Palette.window,
+          borderRadius: BorderRadius.all(Radius.circular(24)),
+          border: Frame.border,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: 20,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              spacing: 2,
+              children: [
+                Text(title, style: AppType.title(size: 20)),
+                if (subtitle != null) Text(subtitle, style: AppType.body(size: 13, color: Palette.muted)),
+              ],
+            ),
+            ...children,
+          ],
+        ),
+      ),
+    );
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+      children: [
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: _maxWidth),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              spacing: 22,
+              spacing: 16,
               children: [
-                Rise(child: Text('What do you bring?', style: AppType.title(size: 24).copyWith(height: 1.08))),
-                LabeledField(
-                  label: 'Name',
-                  controller: _name,
-                  error: _errors['name'],
-                  textCapitalization: TextCapitalization.words,
-                  onChanged: (_) => _edit(() {}),
-                ),
-                LabeledField(label: 'Email', controller: _email, enabled: false),
-                LabeledField(
-                  label: 'Bio (${280 - _bio.text.length} left)',
-                  controller: _bio,
-                  error: _errors['bio'],
-                  hint: 'One line about you',
-                  maxLength: 280,
-                  maxLines: 3,
-                  onChanged: (_) => _edit(() {}),
-                ),
-                for (final field in _single)
-                  ChoiceGroup(
-                    legend: fieldLabels[field]!,
-                    values: options[field],
-                    selected: [?_choices[field]],
-                    error: _errors[field],
-                    onToggle: (value) => _edit(() => _choices[field] = value),
+                section('About you', null, [
+                  LabeledField(
+                    label: 'Name',
+                    controller: _name,
+                    error: _errors['name'],
+                    textCapitalization: TextCapitalization.words,
+                    onChanged: (_) => _edit(() {}),
                   ),
-                ChoiceGroup(
-                  legend: fieldLabels['interests']!,
-                  values: options['interests'],
-                  selected: _interests,
-                  error: _errors['interests'],
-                  onToggle: (value) => _toggle(_interests, value),
-                ),
-                ChoiceGroup(
-                  legend: '${fieldLabels['superpowers']} (up to ${options.maxSuperpowers})',
-                  values: options['superpowers'],
-                  selected: _superpowers,
-                  max: options.maxSuperpowers,
-                  error: _errors['superpowers'],
-                  onToggle: (value) => _toggle(_superpowers, value),
-                ),
-                SkillsField(
-                  skills: _skills,
-                  controller: _skillText,
-                  error: _errors['skills'],
-                  onAdd: _addSkills,
-                  onRemove: (skill) => _edit(() => _skills.remove(skill)),
-                ),
+                  LabeledField(label: 'Email', controller: _email, enabled: false),
+                  LabeledField(
+                    label: 'Bio (${280 - _bio.text.length} left)',
+                    controller: _bio,
+                    error: _errors['bio'],
+                    hint: 'One line about you',
+                    maxLength: 280,
+                    maxLines: 4,
+                    onChanged: (_) => _edit(() {}),
+                  ),
+                ], 0),
+                section('How you work', 'Used to match you with people who work the same way', [
+                  for (final field in _single)
+                    ChoiceGroup(
+                      legend: fieldLabels[field]!,
+                      values: options[field],
+                      selected: [?_choices[field]],
+                      error: _errors[field],
+                      onToggle: (value) => _edit(() => _choices[field] = value),
+                    ),
+                ], 1),
+                section('What you bring', 'Teams look for skills they don\'t have yet', [
+                  ChoiceGroup(
+                    legend: fieldLabels['interests']!,
+                    values: options['interests'],
+                    selected: _interests,
+                    error: _errors['interests'],
+                    onToggle: (value) => _toggle(_interests, value),
+                  ),
+                  ChoiceGroup(
+                    legend: '${fieldLabels['superpowers']} (up to ${options.maxSuperpowers})',
+                    values: options['superpowers'],
+                    selected: _superpowers,
+                    max: options.maxSuperpowers,
+                    error: _errors['superpowers'],
+                    onToggle: (value) => _toggle(_superpowers, value),
+                  ),
+                  SkillsField(
+                    skills: _skills,
+                    controller: _skillText,
+                    error: _errors['skills'],
+                    onAdd: _addSkills,
+                    onTyping: () => _edit(() {}),
+                    onRemove: (skill) => _edit(() => _skills.remove(skill)),
+                  ),
+                ], 2),
                 if (_formError != null) ErrorNote(_formError!),
                 // Easy to find: the account's own page ends with Log out.
-                if (!widget.firstTime) ...[
-                  const Divider(),
+                if (!widget.firstTime)
                   OutlinedButton.icon(
                     onPressed: () => confirmSignOut(context),
                     style: OutlinedButton.styleFrom(
@@ -266,38 +309,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     icon: const Icon(Icons.logout_rounded),
                     label: const Text('Log out'),
                   ),
-                ],
               ],
             ),
           ),
-        ],
-      );
+        ),
+      ],
+    );
+  }
 
   Widget _saveBar() {
     final missing = _missing;
     final status = missing.isNotEmpty
         ? 'Still needed: ${missing.join(', ')}'
         : _saved
-            ? '✓ Saved'
-            : '✓ Looks good';
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: 8,
-        children: [
-          Text(status, textAlign: TextAlign.center, maxLines: 2, style: AppType.body(size: 13, color: Palette.muted)),
-          FilledButton(
-            onPressed: _busy || missing.isNotEmpty ? null : _save,
-            child: Text(
-              _busy
-                  ? 'Saving…'
-                  : widget.firstTime
-                      ? 'Start swiping'
-                      : 'Save',
+        ? '✓ Saved'
+        : '✓ Looks good';
+    return Container(
+      decoration: const BoxDecoration(border: Border(top: Frame.side)),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+      alignment: Alignment.center,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: _maxWidth),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: 8,
+          children: [
+            Text(
+              status,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              style: AppType.body(size: 13, color: Palette.muted),
             ),
-          ),
-        ],
+            FilledButton(
+              onPressed: _busy || missing.isNotEmpty ? null : _save,
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+              child: Text(
+                _busy
+                    ? 'Saving…'
+                    : widget.firstTime
+                    ? 'Start swiping'
+                    : 'Save',
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
