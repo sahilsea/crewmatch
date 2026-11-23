@@ -394,7 +394,7 @@ async function seedRequests() {
 }
 
 // Campus clubs: [name, short, category, tone, verified, description].
-const CLUBS = [
+export const CLUBS = [
   ['Coding Club', 'CC', 'tech', 'crimson', true, 'Weekly contests, DSA nights and the campus hackathon.'],
   ['AI & ML Society', 'AI', 'tech', 'navy', true, 'Paper readings, Kaggle squads and model demos.'],
   ['E-Cell', 'EC', 'business', 'gold', true, 'Pitch nights, founder talks and startup weekends.'],
@@ -427,6 +427,39 @@ async function seedClubs() {
     startsAt: dayAt(day, hour), endsAt: dayAt(day, hour + 2), createdBy: tara?._id, club: byName['Coding Club']._id,
   })));
   return clubs;
+}
+
+// Adds the mock clubs to a live database without touching anything else:
+// clubs that already exist (same name) are skipped, only demo students with no
+// clubs get one, and Coding Club gets its events only when it's newly made.
+// Run with `npm run seed:clubs`. Safe to run more than once.
+export async function addMockClubs() {
+  const made = [];
+  for (const [name, short, category, tone, verified, description] of CLUBS) {
+    const exists = await Club.findOne({ name }).collation({ locale: 'en', strength: 2 });
+    if (!exists) made.push(await Club.create({ name, short, category, tone, verified, description }));
+  }
+  const clubs = await Club.find({ name: { $in: CLUBS.map(([n]) => n) } }).collation({ locale: 'en', strength: 2 });
+  const students = await User.find({ email: /@students\.crewmatch\.dev$/, isAdmin: false, clubs: { $size: 0 } }).sort({ name: 1 });
+  if (clubs.length) {
+    await User.bulkWrite(students.map((u, i) => ({
+      updateOne: { filter: { _id: u._id }, update: { $set: { clubs: [clubs[i % clubs.length]._id] } } },
+    })));
+  }
+  const coding = made.find((c) => c.name === 'Coding Club');
+  if (coding) {
+    const tara = await User.findOne({ name: 'Tara Fernandes', isAdmin: false });
+    await Club.updateOne({ _id: coding._id }, { $set: { leads: ['web@crewmatch.dev', tara?.email].filter(Boolean) } });
+    await Event.create([
+      ['DSA Night: Graphs', 'Shortest paths and union-find, with snacks.', 'workshop', 'Lab 2', 1, 19, 30],
+      ['Mock Interviews', 'Seniors run 20-minute coding interviews.', 'talk', 'Seminar Room', 2, 17, 20],
+      ['Open Source Sprint', 'Pick an issue, ship a PR before dinner.', 'workshop', 'Library Annexe', 3, 14, 40],
+    ].map(([title, summary, category, location, day, hour, points]) => ({
+      kind: 'event', title, summary, category, location, points, status: 'official',
+      startsAt: dayAt(day, hour), endsAt: dayAt(day, hour + 2), createdBy: tara?._id, club: coding._id,
+    })));
+  }
+  return { created: made.map((c) => c.name), skipped: CLUBS.length - made.length, studentsJoined: students.length, codingEvents: coding ? 3 : 0 };
 }
 
 export async function seedDatabase() {
