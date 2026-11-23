@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'update_dialog.dart';
 import '../people/share_card_screen.dart';
 
 import 'package:material_ui/material_ui.dart';
@@ -69,7 +71,7 @@ class LogOutButton extends StatelessWidget {
   );
 }
 
-enum _AccountAction { share, card, profile, light, dark, system, signOut }
+enum _AccountAction { share, card, profile, light, dark, system, update, signOut }
 
 /// The avatar on the right of the menu bar, opening Profile / Log out.
 class AccountMenu extends StatelessWidget {
@@ -96,6 +98,8 @@ class AccountMenu extends StatelessWidget {
             Appearance.instance.choose(ThemeMode.dark);
           case _AccountAction.system:
             Appearance.instance.choose(ThemeMode.system);
+          case _AccountAction.update:
+            checkForUpdatesNow(context);
           case _AccountAction.signOut:
             confirmSignOut(context);
         }
@@ -114,6 +118,8 @@ class AccountMenu extends StatelessWidget {
           CheckedPopupMenuItem(value: _AccountAction.dark, checked: mode == ThemeMode.dark, child: const Text('Dark')),
           CheckedPopupMenuItem(value: _AccountAction.system, checked: mode == ThemeMode.system, child: const Text('Match phone')),
           const PopupMenuDivider(),
+          // The website is always up to date; only the Android app checks.
+          if (!kIsWeb) const PopupMenuItem(value: _AccountAction.update, child: Text('Check for updates')),
           PopupMenuItem(
             value: _AccountAction.signOut,
             child: Row(
