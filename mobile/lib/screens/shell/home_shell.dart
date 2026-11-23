@@ -1,6 +1,7 @@
 import '../../models/team_request.dart';
 import '../../state/app_update.dart';
 import '../../state/incoming_link.dart';
+import '../../state/update_notifier.dart';
 import '../people/person_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -41,8 +42,10 @@ class _HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     // A newer Android build on GitHub: offer it once per launch.
-    UpdateChecker.checkOnce().then((update) {
-      if (update != null && mounted) showUpdateDialog(context, update);
+    // Then ask (once) to allow notifications, so later versions can announce themselves.
+    UpdateChecker.checkOnce().then((update) async {
+      if (update != null && mounted) await showUpdateDialog(context, update);
+      await UpdateNotifier.askPermissionOnce();
     });
     // Opened from a profile link: show that person once you're in.
     final handle = IncomingLink.take();
