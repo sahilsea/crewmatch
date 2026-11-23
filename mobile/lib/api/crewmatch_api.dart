@@ -1,4 +1,5 @@
 import '../models/auth_result.dart';
+import '../models/club.dart';
 import '../models/crew.dart';
 import '../models/deck.dart';
 import '../models/admin_stats.dart';
@@ -122,8 +123,8 @@ class CrewMatchApi {
 
   // Finding people: search, profile links and team-up requests
 
-  Future<List<User>> searchPeople({String query = '', bool noCrew = false, String? role}) async {
-    final params = {if (query.trim().isNotEmpty) 'q': query.trim(), if (noCrew) 'free': '1', 'role': ?role};
+  Future<List<User>> searchPeople({String query = '', bool noCrew = false, String? role, String? clubId}) async {
+    final params = {if (query.trim().isNotEmpty) 'q': query.trim(), if (noCrew) 'free': '1', 'role': ?role, 'club': ?clubId};
     final path = params.isEmpty ? '/users/search' : '/users/search?${Uri(queryParameters: params).query}';
     return User.listFrom((await client.get(path))['results']);
   }
@@ -158,6 +159,34 @@ class CrewMatchApi {
 
   Future<void> withdrawRequest(String id) async {
     await client.delete('/requests/$id');
+  }
+
+  // Clubs
+
+  Future<List<Club>> clubs({String query = '', String? category, bool leadOnly = false}) async {
+    final params = {if (query.trim().isNotEmpty) 'q': query.trim(), 'category': ?category, if (leadOnly) 'lead': '1'};
+    return Club.listFrom((await client.get(params.isEmpty ? '/clubs' : '/clubs?${Uri(queryParameters: params).query}'))['clubs']);
+  }
+
+  Future<ClubPage> club(String id) async => ClubPage.fromJson(await client.get('/clubs/$id'));
+
+  Future<User> joinClub(String id) async => _user(await client.post('/clubs/$id/join'));
+
+  Future<User> leaveClub(String id) async => _user(await client.delete('/clubs/$id/join'));
+
+  /// The club picker: sets all your clubs at once (at most 5).
+  Future<User> setMyClubs(List<String> ids) async => _user(await client.put('/users/me/clubs', {'clubIds': ids}));
+
+  Future<List<Club>> adminClubs() async => Club.listFrom((await client.get('/admin/clubs'))['clubs']);
+
+  Future<Club> createClub(Map<String, Object?> fields) async =>
+      Club.fromJson((await client.post('/admin/clubs', fields))['club'] as Map<String, dynamic>);
+
+  Future<Club> updateClub(String id, Map<String, Object?> fields) async =>
+      Club.fromJson((await client.patch('/admin/clubs/$id', fields))['club'] as Map<String, dynamic>);
+
+  Future<void> deleteClub(String id) async {
+    await client.delete('/admin/clubs/$id');
   }
 
   // Hackathon hub

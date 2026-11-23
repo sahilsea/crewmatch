@@ -210,7 +210,8 @@ describe('seed data', () => {
 
   test('6 events (1 ended, 2 live, 3 upcoming) and 5 challenges (1 ended, 4 open)', async () => {
     const count = (list, state) => list.filter((e) => e.state === state).length;
-    const official = (list) => list.filter((e) => e.status === 'official');
+    // The hackathon's own events: official, and not hosted by a club.
+    const official = (list) => list.filter((e) => e.status === 'official' && !e.club);
     const events = official((await api('GET', '/events?kind=event', { token: web })).body.events);
     const challenges = official((await api('GET', '/events?kind=challenge', { token: web })).body.events);
     assert.equal(events.length, 6);
@@ -255,7 +256,7 @@ describe('seed data', () => {
     assert.equal(new Set(scored).size, scored.length, 'no ties among scoring crews');
 
     const stats = (await api('GET', '/admin/stats', { token: admin })).body;
-    assert.equal(stats.events, 6);
+    assert.equal(stats.events, 6 + 3, 'six hackathon events and three Coding Club ones');
     assert.equal(stats.challenges, 5);
     assert.ok(stats.pendingSubmissions >= 2);
     assert.deepEqual([stats.pendingEvents, stats.communityEvents], [2, 1]);
@@ -898,6 +899,86 @@ describe('finding people: handles, search and team-up requests', () => {
     assert.equal(targets.length, 21);
     for (const t of targets.slice(0, 20)) assert.equal((await send(a, t)).status, 201);
     assert.equal((await send(a, targets[20])).status, 429);
+  });
+});
+
+describe('clubs', () => {
+  const clubsFor = async (token) => (await api('GET', '/clubs', { token })).body.clubs;
+
+  test('eight seeded clubs; the demo account is in Coding Club and Design Guild', async () => {
+    const web = await login('web@crewmatch.dev');
+    const clubs = await clubsFor(web);
+    assert.equal(clubs.length, 8);
+    assert.deepEqual(clubs.filter((c) => c.joined).map((c) => c.name).sort(), ['Coding Club', 'Design Guild']);
+    const cc = clubs.find((c) => c.name === 'Coding Club');
+    assert.equal(cc.isLead, true);
+    assert.ok(cc.memberCount >= 3 && cc.weekEvents >= 1);
+
+    const page = (await api('GET', `/clubs/${cc.id}`, { token: web })).body;
+    assert.equal(page.events.length, 3);
+    assert.ok(page.events.every((e) => e.club.name === 'Coding Club' && e.status === 'official'));
+    assert.ok(page.members.length >= 2 && page.members.every((m) => m.clubs.some((c) => c.id === cc.id)));
+  });
+
+  test('join, leave, the picker, and at most five clubs', async () => {
+    const u = await newUser();
+    const clubs = await clubsFor(u.token);
+    const joined = await api('POST', `/clubs/${clubs[0].id}/join`, { token: u.token });
+    assert.deepEqual(joined.body.user.clubIds, [clubs[0].id]);
+    const left = await api('DELETE', `/clubs/${clubs[0].id}/join`, { token: u.token });
+    assert.deepEqual(left.body.user.clubIds, []);
+
+    const five = clubs.slice(0, 5).map((c) => c.id);
+    assert.equal((await api('PUT', '/users/me/clubs', { token: u.token, body: { clubIds: five } })).status, 200);
+    assert.equal((await api('POST', `/clubs/${clubs[5].id}/join`, { token: u.token })).status, 400);
+    assert.equal((await api('PUT', '/users/me/clubs', { token: u.token, body: { clubIds: clubs.slice(0, 6).map((c) => c.id) } })).status, 400);
+  });
+
+  test('search by club, and a shared club boosts the fit', async () => {
+    const u = await newUser();
+    const cc = (await clubsFor(u.token)).find((c) => c.name === 'Coding Club');
+    const before = (await api('GET', `/users/search?club=${cc.id}`, { token: u.token })).body.results;
+    assert.ok(before.length > 0 && before.every((p) => p.clubs.some((c) => c.id === cc.id)));
+
+    await api('POST', `/clubs/${cc.id}/join`, { token: u.token });
+    const after = (await api('GET', `/users/search?club=${cc.id}`, { token: u.token })).body.results;
+    const one = before[0];
+    const again = after.find((p) => p.id === one.id);
+    assert.ok(again.score >= one.score && again.score <= 100);
+    assert.ok(after.some((p) => p.tags.includes('In your club')));
+  });
+
+  test("club leads post events for the club; a verified club's count straight away", async () => {
+    const web = await login('web@crewmatch.dev');
+    const clubs = await clubsFor(web);
+    const cc = clubs.find((c) => c.name === 'Coding Club');
+    const body = { kind: 'event', title: 'Lead Night', summary: 'By the lead', category: 'talk', startsAt: minutesFromNow(30), endsAt: minutesFromNow(90), askPoints: 25, clubId: cc.id };
+    const made = await api('POST', '/events', { token: web, body });
+    assert.equal(made.status, 201, JSON.stringify(made.body));
+    assert.deepEqual([made.body.event.status, made.body.event.points, made.body.event.club.name], ['official', 25, 'Coding Club']);
+
+    const other = await newUser();
+    assert.equal((await api('POST', '/events', { token: other.token, body })).status, 403);
+    const dg = clubs.find((c) => c.name === 'Design Guild');
+    await api('PATCH', `/admin/clubs/${dg.id}`, { token: admin, body: { leads: ['web@crewmatch.dev'] } });
+    const unverified = await api('POST', '/events', { token: web, body: { ...body, title: 'Poster Jam', clubId: dg.id } });
+    assert.deepEqual([unverified.body.event.status, unverified.body.event.points], ['pending', 0]);
+  });
+
+  test('organisers create, edit and delete clubs; members only can not', async () => {
+    const u = await newUser();
+    assert.equal((await api('POST', '/admin/clubs', { token: u.token, body: { name: 'Nope', short: 'NO' } })).status, 403);
+    const made = await api('POST', '/admin/clubs', { token: admin, body: { name: 'Chess Club', short: 'cg', category: 'culture', tone: 'navy', leads: ['Lead@Test.dev'] } });
+    assert.equal(made.status, 201, JSON.stringify(made.body));
+    assert.deepEqual([made.body.club.short, made.body.club.leads], ['CG', ['lead@test.dev']]);
+    assert.equal((await api('POST', '/admin/clubs', { token: admin, body: { name: 'chess club', short: 'CC' } })).status, 409);
+    assert.equal((await api('POST', '/admin/clubs', { token: admin, body: { name: 'Bad', short: 'B', leads: ['not-an-email'] } })).status, 400);
+
+    const edited = await api('PATCH', `/admin/clubs/${made.body.club.id}`, { token: admin, body: { verified: true } });
+    assert.equal(edited.body.club.verified, true);
+    await api('POST', `/clubs/${made.body.club.id}/join`, { token: u.token });
+    assert.equal((await api('DELETE', `/admin/clubs/${made.body.club.id}`, { token: admin })).status, 204);
+    assert.deepEqual((await api('GET', '/auth/me', { token: u.token })).body.user.clubIds, []);
   });
 });
 

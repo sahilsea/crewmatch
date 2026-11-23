@@ -45,6 +45,8 @@ const eventSchema = new Schema(
     // (no points) or pending (points asked for, waiting for an organiser).
     status: { type: String, enum: EVENT_STATUSES, default: 'official' },
     askedPoints: { type: Number, default: 0, min: 0, max: MAX_ASK_POINTS },
+    // Hosted for a club by one of its leads.
+    club: { type: Schema.Types.ObjectId, ref: 'Club', default: null },
   },
   { timestamps: true }
 );
@@ -119,6 +121,7 @@ eventSchema.methods.toMember = function (crewId, userId = null) {
     status: this.status,
     askedPoints: this.askedPoints,
     host: this.host(),
+    club: this.club?.name ? { id: this.club._id.toString(), name: this.club.name, short: this.club.short, tone: this.club.tone, verified: this.club.verified } : null,
     hosting,
     ...(hosting && { checkinCode: this.kind === 'event' ? this.checkinCode : null }),
     crewCount: entries.length,

@@ -7,6 +7,8 @@ import '../../api/api_exception.dart';
 import '../../models/user.dart';
 import '../../state/session.dart';
 import '../../ui/ui.dart';
+import '../clubs/club_ui.dart';
+import '../../models/club.dart';
 import '../discover/profile_card.dart';
 import 'card_preview_screen.dart';
 
@@ -457,6 +459,10 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                           ),
                         ),
                         _Section(
+                          title: 'Your clubs',
+                          child: _ClubsRow(),
+                        ),
+                        _Section(
                           title: 'Show on your card',
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -599,4 +605,50 @@ class _SheetItem extends StatelessWidget {
     leading: Icon(icon, color: color),
     title: Text(label, style: AppType.body(size: 16, color: color)),
   );
+}
+
+/// Your clubs as chips, with a button to change them.
+class _ClubsRow extends StatefulWidget {
+  const _ClubsRow();
+
+  @override
+  State<_ClubsRow> createState() => _ClubsRowState();
+}
+
+class _ClubsRowState extends State<_ClubsRow> {
+  List<Club>? _clubs;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final clubs = await context.api.clubs();
+      if (mounted) setState(() => _clubs = clubs);
+    } catch (_) {
+      // Leaves the row empty; picking still works.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ids = SessionScope.watch(context).user?.clubIds ?? const [];
+    final mine = [for (final c in _clubs ?? <Club>[]) if (ids.contains(c.id)) c];
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        for (final c in mine) ClubChip(c),
+        ActionChip(
+          avatar: Icon(mine.isEmpty ? Icons.add_rounded : Icons.edit_outlined, size: 18),
+          label: Text(mine.isEmpty ? 'Add your clubs' : 'Change'),
+          onPressed: () => showClubPicker(context).then((_) => _load()),
+        ),
+      ],
+    );
+  }
 }

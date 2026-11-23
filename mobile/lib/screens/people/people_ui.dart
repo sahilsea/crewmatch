@@ -9,6 +9,7 @@ import '../../state/session.dart';
 import '../../ui/ui.dart';
 import '../../util/labels.dart';
 import 'person_screen.dart';
+import '../clubs/club_ui.dart';
 
 /// Someone's profile link: `https://crewmatch10.netlify.app/u/tara-fernandes`.
 /// In the browser it uses the page's own address.
@@ -134,9 +135,12 @@ void announceSent(BuildContext context, User person, SendResult result) => showN
 
 /// A person in a list: photo, name and fit, role and skills, crew status.
 class PersonRow extends StatelessWidget {
-  const PersonRow({super.key, required this.person, required this.onTap, this.trailing, this.selected = false});
+  const PersonRow({super.key, required this.person, required this.onTap, this.trailing, this.selected = false, this.highlightClubId});
 
   final User person;
+
+  /// Searching one club: show their clubs, with that one highlighted.
+  final String? highlightClubId;
   final VoidCallback onTap;
   final Widget? trailing;
   final bool selected;
@@ -171,6 +175,15 @@ class PersonRow extends StatelessWidget {
                         crewStatus(person),
                         style: AppType.body(size: 12, weight: FontWeight.w500, color: person.crewName == null ? Palette.link : Palette.muted),
                       ),
+                      if (highlightClubId != null && person.clubs.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Wrap(
+                            spacing: 4,
+                            runSpacing: 4,
+                            children: [for (final c in person.clubs) ClubChip(c, highlight: c.id == highlightClubId)],
+                          ),
+                        ),
                     ],
                   ),
                 ),

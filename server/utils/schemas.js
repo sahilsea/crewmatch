@@ -130,8 +130,9 @@ export const studentEventSchema = z
     endsAt: date,
     capacity: z.number().int().min(1).max(500).nullable(),
     askPoints: z.number().int().min(0).max(MAX_ASK_POINTS),
+    clubId: z.string().max(40),
   })
-  .partial({ location: true, capacity: true, askPoints: true });
+  .partial({ location: true, capacity: true, askPoints: true, clubId: true });
 
 export const officialSchema = z.object({ points: z.number().int().min(0).max(1000).optional() });
 
@@ -140,6 +141,21 @@ export const teamRequestSchema = z.object({
   note: z.string().trim().max(140).optional(),
   source: z.enum(['discover', 'search', 'profile', 'link', 'qr']).optional(),
 });
+
+const emailList = z.array(z.string().trim().toLowerCase().pipe(z.email({ error: 'Enter valid emails' }))).max(10);
+
+// Organisers' club form. PATCH takes any subset.
+export const clubSchema = z.object({
+  name: z.string().trim().min(2).max(40),
+  short: z.string().trim().min(1).max(3),
+  category: z.enum(['tech', 'design', 'business', 'culture', 'sports']),
+  tone: z.enum(['crimson', 'navy', 'gold', 'cream']),
+  description: z.string().trim().max(140),
+  verified: z.boolean(),
+  leads: emailList,
+}).partial({ category: true, tone: true, description: true, verified: true, leads: true });
+
+export const myClubsSchema = z.object({ clubIds: z.array(z.string().max(40)).max(5) });
 
 export const checkinSchema = z.object({ code: z.string().trim().max(50) });
 

@@ -1,3 +1,4 @@
+import 'club.dart';
 import 'json.dart';
 
 /// Events are things a crew goes to; challenges are tasks a crew takes on.
@@ -98,6 +99,7 @@ class HubEvent {
     this.hosting = false,
     this.checkinCode,
     this.entries = const [],
+    this.club,
   });
 
   factory HubEvent.fromJson(Map<String, dynamic> json) {
@@ -126,6 +128,7 @@ class HubEvent {
       hosting: json['hosting'] == true,
       checkinCode: json['checkinCode'] as String?,
       entries: [for (final e in objectList(json['entries'])) AdminEntry.fromJson(e)],
+      club: json['club'] is Map<String, dynamic> ? ClubTag.fromJson(json['club'] as Map<String, dynamic>) : null,
     );
   }
 
@@ -169,6 +172,9 @@ class HubEvent {
 
   /// Every crew's entry. Organisers only.
   final List<AdminEntry> entries;
+
+  /// The club hosting it, if a club lead posted it.
+  final ClubTag? club;
 
   bool get isOfficial => status == EventStatus.official;
   bool get isPending => status == EventStatus.pending;

@@ -7,6 +7,8 @@ import '../../models/team_request.dart';
 import '../../models/user.dart';
 import '../../state/session.dart';
 import '../../ui/ui.dart';
+import '../clubs/club_screen.dart';
+import '../clubs/club_ui.dart';
 import '../../util/labels.dart';
 import 'people_ui.dart';
 import 'share_card_screen.dart';
@@ -171,6 +173,16 @@ class _PersonViewState extends State<PersonView> {
                       ],
                       const SizedBox(height: 10),
                       if (!_isMe && p.score != null) Rise(child: _FitCard(person: p)),
+                      if (p.clubs.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            for (final c in p.clubs) ClubChip(c, onTap: () => Navigator.of(context).push(ClubScreen.route(c.id))),
+                          ],
+                        ),
+                      ],
                       if (p.skills.isNotEmpty) ...[
                         const SizedBox(height: 6),
                         Wrap(spacing: 8, runSpacing: 8, children: [for (final s in p.skills) Chip(label: Text(s))]),

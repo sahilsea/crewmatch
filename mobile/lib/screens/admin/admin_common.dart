@@ -9,6 +9,7 @@ enum AdminTab {
   overview('Overview', Icons.space_dashboard_outlined),
   events('Events', Icons.event_outlined),
   review('Review', Icons.fact_check_outlined),
+  clubs('Clubs', Icons.groups_2_outlined),
   ranks('Ranks', Icons.leaderboard_outlined);
 
   const AdminTab(this.label, this.icon);

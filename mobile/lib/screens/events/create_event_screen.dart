@@ -1,10 +1,12 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../api/api_exception.dart';
+import '../../models/club.dart';
 import '../../models/hub_event.dart';
 import '../../state/session.dart';
 import '../../ui/ui.dart';
 import '../../util/when.dart';
+import '../clubs/club_ui.dart';
 
 /// A student hosts their own event or challenge. It goes live straight away
 /// as a community event; asking for points sends it to the organisers.
@@ -39,6 +41,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   String? _error;
   HubEvent? _made;
 
+  /// Clubs you lead: you can post as one of them.
+  var _leadClubs = <Club>[];
+  String? _clubId;
+
+  Club? get _club => [for (final c in _leadClubs) if (c.id == _clubId) c].firstOrNull;
+
   @override
   void initState() {
     super.initState();
@@ -47,6 +55,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     for (final c in [_title, _summary]) {
       c.addListener(() => setState(() {}));
     }
+    context.api.clubs(leadOnly: true).then((clubs) {
+      if (mounted) setState(() => _leadClubs = clubs);
+    }, onError: (Object _) {});
   }
 
   @override
@@ -101,6 +112,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         'startsAt': startsAt.toUtc().toIso8601String(),
         'endsAt': endsAt.toUtc().toIso8601String(),
         'askPoints': _ask ? _askPoints : 0,
+        'clubId': ?_clubId,
       });
       if (mounted) setState(() => _made = made);
     } on ApiException catch (e) {
@@ -170,6 +182,26 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 }),
               ),
             ),
+            if (_leadClubs.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Fieldset(
+                legend: 'Host as',
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ChoiceChip(label: const Text('Just me'), selected: _clubId == null, onSelected: (_) => setState(() => _clubId = null)),
+                    for (final c in _leadClubs)
+                      ChoiceChip(
+                        avatar: ClubLogo(c, size: 22),
+                        label: Text(c.name),
+                        selected: _clubId == c.id,
+                        onSelected: (_) => setState(() => _clubId = c.id),
+                      ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             LabeledField(
               label: 'Title',
@@ -234,7 +266,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               children: [
                 const Icon(Icons.check_rounded, size: 18, color: Palette.link),
                 Expanded(
-                  child: Text('Goes live right away as a community event.', style: AppType.body(size: 14, color: Palette.muted)),
+                  child: Text(
+                    _club?.verified ?? false
+                        ? '${_club!.name} is verified, so this counts for points straight away.'
+                        : 'Goes live right away as a community event.',
+                    style: AppType.body(size: 14, color: Palette.muted),
+                  ),
                 ),
               ],
             ),
@@ -248,7 +285,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         child: FilledButton(
           onPressed: _ready ? _publish : null,
           style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-          child: Text(_busy ? 'Publishing…' : (_ask ? 'Publish and send for review' : 'Publish')),
+          child: Text(
+            _busy
+                ? 'Publishing…'
+                : _club != null
+                    ? 'Publish for ${_club!.name}'
+                    : (_ask ? 'Publish and send for review' : 'Publish'),
+          ),
         ),
       ),
     ],
@@ -381,7 +424,11 @@ class _Published extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    const InfoTag('Community', color: Palette.high, textColor: Palette.ink),
+                    if (event.club case final club?) ClubChip(club),
+                    if (event.isOfficial)
+                      InfoTag('+${event.points} pts', icon: Icons.bolt_rounded)
+                    else
+                      const InfoTag('Community', color: Palette.high, textColor: Palette.ink),
                     if (event.isPending) InfoTag('+${event.askedPoints} pending review', icon: Icons.schedule_rounded),
                     if (event.checkinCode case final code?) InfoTag('Code $code', color: Palette.navy, textColor: Palette.cream),
                   ],
