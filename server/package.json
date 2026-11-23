@@ -10,6 +10,7 @@
     "seed": "node seed/seed.js",
     "seed:clubs": "node seed/clubs.js",
     "seed:profiles": "node seed/profiles.js",
+    "clean:attachments": "node seed/clean-attachments.js",
     "test": "node --test"
   },
   "dependencies": {

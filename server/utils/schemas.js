@@ -82,15 +82,8 @@ export const createPostSchema = z.object({
 
 export const commentSchema = z.object({ text: z.string().trim().min(1).max(300) });
 
-// A chat line: text, a photo, a document, or text with one of them.
-export const messageSchema = z
-  .object({
-    text: z.string().trim().max(1000).optional().default(''),
-    photo: z.string().max(4_500_000).optional(),
-    file: z.object({ name: z.string().trim().min(1).max(120), data: z.string().max(14_000_000) }).optional(),
-  })
-  .refine((m) => m.text.length > 0 || m.photo || m.file, 'Write a message or attach something')
-  .refine((m) => !(m.photo && m.file), 'Attach a photo or a file, not both');
+// A chat line. Text only: photos and documents filled up the database.
+export const messageSchema = z.object({ text: z.string().trim().min(1, 'Write a message').max(1000) });
 
 export const photoUploadSchema = z.object({ photo: z.string().min(1).max(4_500_000) });
 

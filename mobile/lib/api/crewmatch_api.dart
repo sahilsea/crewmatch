@@ -306,16 +306,8 @@ class CrewMatchApi {
       ];
 
   /// Text, and optionally a photo or a file as `data:` URLs.
-  Future<ChatMessage> sendMessage(String text, {String? photo, ({String name, String data})? file}) async =>
-      ChatMessage.fromJson((await client.post(
-        '/crews/mine/messages',
-        {
-          'text': text,
-          'photo': ?photo,
-          if (file != null) 'file': {'name': file.name, 'data': file.data},
-        },
-        const Duration(seconds: 90),
-      ))['message'] as Map<String, dynamic>);
+  Future<ChatMessage> sendMessage(String text) async =>
+      ChatMessage.fromJson((await client.post('/crews/mine/messages', {'text': text}))['message'] as Map<String, dynamic>);
 
   /// A document from the crew chat, downloaded with your sign-in.
   Future<List<int>> downloadFile(String url) => client.getBytes(url);

@@ -1207,34 +1207,16 @@ describe('swipe cards', () => {
   });
 });
 
-describe('chat attachments', () => {
-  const DOC = `data:application/pdf;base64,${Buffer.from('%PDF-1.4 hello').toString('base64')}`;
-
-  test('photos and documents; documents are crew-only', async () => {
-    const crew = await newCrew('Sharers');
-    const outsider = await newCrew('Outsiders');
-    const photo = await api('POST', '/crews/mine/messages', { token: crew.a.token, body: { photo: PIXEL } });
-    assert.equal(photo.status, 201, JSON.stringify(photo.body));
-    assert.equal(photo.body.message.attachment.kind, 'photo');
-    assert.equal(photo.body.message.text, '');
-
-    const doc = await api('POST', '/crews/mine/messages', {
-      token: crew.a.token, body: { text: 'Deck v1', file: { name: 'Pitch deck.pdf', data: DOC } },
-    });
-    const att = doc.body.message.attachment;
-    assert.deepEqual([att.kind, att.name, att.type], ['file', 'Pitch deck.pdf', 'application/pdf']);
-
-    const mine = await fetch(`http://127.0.0.1:${PORT}${att.url}`, { headers: { Authorization: `Bearer ${crew.b.token}` } });
-    assert.equal(mine.status, 200);
-    assert.equal(await mine.text(), '%PDF-1.4 hello');
-    const theirs = await fetch(`http://127.0.0.1:${PORT}${att.url}`, { headers: { Authorization: `Bearer ${outsider.a.token}` } });
-    assert.equal(theirs.status, 404);
-
-    assert.equal((await api('POST', '/crews/mine/messages', { token: crew.a.token, body: {} })).status, 400);
-    const exe = await api('POST', '/crews/mine/messages', {
-      token: crew.a.token, body: { file: { name: 'x.exe', data: 'data:application/x-msdownload;base64,TVo=' } },
-    });
-    assert.equal(exe.status, 400);
+describe('chat is text only', () => {
+  test('photos and documents are not stored; empty messages are refused', async () => {
+    const crew = await newCrew('Texters');
+    const photoOnly = await api('POST', '/crews/mine/messages', { token: crew.a.token, body: { photo: PIXEL } });
+    assert.equal(photoOnly.status, 400);
+    const withText = await api('POST', '/crews/mine/messages', { token: crew.a.token, body: { text: 'Deck v1', photo: PIXEL } });
+    assert.equal(withText.status, 201);
+    assert.equal(withText.body.message.text, 'Deck v1');
+    assert.equal(withText.body.message.attachment, undefined);
+    assert.equal((await api('GET', '/crews/mine/files/abc', { token: crew.a.token })).status, 404);
   });
 });
 
