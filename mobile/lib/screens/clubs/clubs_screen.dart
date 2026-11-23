@@ -239,6 +239,7 @@ class _ClubRow extends StatelessWidget {
                       children: [
                         Flexible(child: Text(club.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.body(size: 15.5, weight: FontWeight.w500))),
                         if (club.verified) const VerifiedBadge(),
+                        if (club.demo) const DemoBadge(small: true),
                       ],
                     ),
                     Text(

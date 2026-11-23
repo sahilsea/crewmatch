@@ -113,7 +113,11 @@ class _Card extends StatelessWidget {
                     decoration: const BoxDecoration(color: Palette.window, shape: BoxShape.circle),
                     child: Avatar(url: user.avatar, name: user.name, size: 88, background: Palette.pink),
                   ),
-                  Text(user.name, style: AppType.title(size: 28)),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    spacing: 8,
+                    children: [Flexible(child: Text(user.name, style: AppType.title(size: 28))), if (user.demo) const DemoBadge()],
+                  ),
                   Text(
                     [
                       if (user.role != null) optionLabel(user.role!),

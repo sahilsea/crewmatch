@@ -103,10 +103,14 @@ userSchema.statics.backfillHandles = async function () {
   return missing.length;
 };
 
+export const isDemoEmail = (email) => typeof email === 'string' && /@(students\.)?crewmatch\.dev$/.test(email);
+
 userSchema.methods.toPublic = function () {
   const out = { id: this._id.toString() };
   for (const f of PUBLIC_FIELDS) out[f] = this[f];
   out.coverUrl = this.coverPhoto ? `/api/photos/${this.coverPhoto}` : null;
+  // Seeded sample accounts, so people can tell them from real students.
+  out.demo = isDemoEmail(this.email);
   return out;
 };
 

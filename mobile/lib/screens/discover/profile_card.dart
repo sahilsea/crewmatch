@@ -99,11 +99,12 @@ class ProfileCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         spacing: 2,
                         children: [
-                          Text(
-                            person.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppType.title(size: 22),
+                          Row(
+                            spacing: 8,
+                            children: [
+                              Flexible(child: Text(person.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.title(size: 22))),
+                              if (person.demo) const DemoBadge(small: true),
+                            ],
                           ),
                           if (meta.isNotEmpty)
                             Text(
@@ -188,7 +189,7 @@ class _Cover extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             // A texture on the preset covers, so a big cover never reads as empty.
-            if (person.cover == 'circuit') const CustomPaint(painter: _CircuitPainter()) else if (person.coverUrl == null) const CustomPaint(painter: _DotsPainter()),
+            if (person.cover == 'circuit') const CustomPaint(painter: _CircuitPainter()) else if (person.coverUrl == null) const CustomPaint(painter: DotsPainter()),
             if (fit != null) Positioned(top: 14, left: 14, child: _FitTag(fit!)),
           ],
         ),
@@ -196,8 +197,8 @@ class _Cover extends StatelessWidget {
 }
 
 /// Soft gold dots for the preset covers.
-class _DotsPainter extends CustomPainter {
-  const _DotsPainter();
+class DotsPainter extends CustomPainter {
+  const DotsPainter();
 
   @override
   void paint(Canvas canvas, Size size) {

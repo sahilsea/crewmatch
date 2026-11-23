@@ -4,7 +4,7 @@ import 'user.dart';
 
 /// The small club badge on cards, profiles and events.
 class ClubTag {
-  const ClubTag({required this.id, required this.name, required this.short, this.tone = 'navy', this.verified = false});
+  const ClubTag({required this.id, required this.name, required this.short, this.tone = 'navy', this.verified = false, this.demo = false});
 
   factory ClubTag.fromJson(Map<String, dynamic> json) => ClubTag(
         id: json['id'] as String,
@@ -12,6 +12,7 @@ class ClubTag {
         short: json['short'] as String? ?? '',
         tone: json['tone'] as String? ?? 'navy',
         verified: json['verified'] == true,
+        demo: json['demo'] == true,
       );
 
   static List<ClubTag> listFrom(Object? json) => [for (final c in objectList(json)) ClubTag.fromJson(c)];
@@ -27,6 +28,9 @@ class ClubTag {
 
   /// Its events count for points without review.
   final bool verified;
+
+  /// A sample club from the demo data.
+  final bool demo;
 }
 
 /// A campus club (`GET /clubs`).
@@ -37,6 +41,7 @@ class Club extends ClubTag {
     required super.short,
     super.tone,
     super.verified,
+    super.demo,
     this.category = 'tech',
     this.description = '',
     this.memberCount = 0,
@@ -52,6 +57,7 @@ class Club extends ClubTag {
         short: json['short'] as String? ?? '',
         tone: json['tone'] as String? ?? 'navy',
         verified: json['verified'] == true,
+        demo: json['demo'] == true,
         category: json['category'] as String? ?? 'tech',
         description: json['description'] as String? ?? '',
         memberCount: intOr(json['memberCount']),
@@ -87,6 +93,7 @@ class Club extends ClubTag {
         short: short,
         tone: tone,
         verified: verified,
+        demo: demo,
         category: category,
         description: description,
         memberCount: memberCount ?? this.memberCount,

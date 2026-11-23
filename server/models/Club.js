@@ -21,6 +21,8 @@ const clubSchema = new Schema(
     verified: { type: Boolean, default: false },
     // Emails of students who can post events for the club.
     leads: [{ type: String, lowercase: true, trim: true }],
+    // Sample clubs from the seed scripts, shown with a Demo badge.
+    demo: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
@@ -29,7 +31,7 @@ clubSchema.index({ name: 1 }, { unique: true, collation: { locale: 'en', strengt
 
 // The small badge shown on cards, profiles and events.
 clubSchema.methods.toTag = function () {
-  return { id: this.id, name: this.name, short: this.short, tone: this.tone, verified: this.verified };
+  return { id: this.id, name: this.name, short: this.short, tone: this.tone, verified: this.verified, demo: this.demo };
 };
 
 clubSchema.methods.toPublic = function () {

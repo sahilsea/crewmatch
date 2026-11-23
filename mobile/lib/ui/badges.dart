@@ -202,3 +202,30 @@ class TickBox extends StatelessWidget {
     child: GlyphIcon(checked ? Glyph.check : Glyph.cross, size: size * 0.5),
   );
 }
+
+/// Marks sample people and clubs from the demo data, so nobody mistakes them for real.
+class DemoBadge extends StatelessWidget {
+  const DemoBadge({super.key, this.small = false});
+
+  final bool small;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+        message: 'Sample from the demo data, not a real student',
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: small ? 6 : 8, vertical: small ? 1 : 2),
+          decoration: BoxDecoration(
+            borderRadius: const BorderRadius.all(Radius.circular(999)),
+            border: Border.all(color: Palette.dashed),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            spacing: 3,
+            children: [
+              Icon(Icons.science_outlined, size: small ? 11 : 13, color: Palette.muted),
+              Text('Demo', style: AppType.body(size: small ? 10.5 : 12, weight: FontWeight.w500, color: Palette.muted)),
+            ],
+          ),
+        ),
+      );
+}

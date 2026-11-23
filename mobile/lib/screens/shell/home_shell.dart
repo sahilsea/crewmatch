@@ -42,27 +42,40 @@ class _HomeShellState extends State<HomeShell> {
     final handle = IncomingLink.take();
     if (handle != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) Navigator.of(context).push(PersonScreen.route(handle, source: RequestSource.link));
+        if (mounted) (_pages.currentState ?? Navigator.of(context)).push(PersonScreen.route(handle, source: RequestSource.link));
       });
     }
   }
+
+  /// With the side rail, pages opened from a tab (a profile, a club) open
+  /// beside the rail instead of covering it.
+  final _pages = GlobalKey<NavigatorState>();
+
+  /// Back to the tab itself, closing any pages opened on top of it.
+  void _closePages() => _pages.currentState?.popUntil((r) => r.isFirst);
 
   /// Bumped to rebuild one tab from scratch.
   final _generation = {for (final tab in AppTab.values) tab: 0};
 
   /// The dock or rail: switch, or reload the tab that's already open.
-  void _select(AppTab tab) => setState(() {
+  void _select(AppTab tab) {
+    _closePages();
+    setState(() {
         if (tab == _tab) _generation[tab] = _generation[tab]! + 1;
         _tab = _lastTab = tab;
         _opened.add(tab);
       });
+  }
 
   /// Another screen sending you here: show it with current data.
-  void _open(AppTab tab) => setState(() {
+  void _open(AppTab tab) {
+    _closePages();
+    setState(() {
         if (_opened.contains(tab)) _generation[tab] = _generation[tab]! + 1;
         _tab = _lastTab = tab;
         _opened.add(tab);
       });
+  }
 
   Widget _build(AppTab tab, bool wide) => switch (tab) {
         AppTab.discover => DiscoverScreen(onOpen: _open, wide: wide),
@@ -106,7 +119,14 @@ class _HomeShellState extends State<HomeShell> {
                     child: SizedBox(
                       width: c.maxWidth.clamp(0, size.twoPane ? 1320 : c.maxWidth).toDouble(),
                       height: c.maxHeight,
-                      child: _screen(size.twoPane),
+                      child: NavigatorPopHandler(
+                        onPopWithResult: (_) => _pages.currentState?.maybePop(),
+                        child: Navigator(
+                          key: _pages,
+                          pages: [MaterialPage(key: const ValueKey('tabs'), child: _screen(size.twoPane))],
+                          onDidRemovePage: (_) {},
+                        ),
+                      ),
                     ),
                   ),
                 ),

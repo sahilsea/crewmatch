@@ -10,6 +10,8 @@ import '../../ui/ui.dart';
 import '../clubs/club_screen.dart';
 import '../clubs/club_ui.dart';
 import '../../util/labels.dart';
+import '../discover/fit_details.dart';
+import '../discover/profile_card.dart';
 import 'people_ui.dart';
 import 'share_card_screen.dart';
 
@@ -29,7 +31,7 @@ class PersonScreen extends StatelessWidget {
         body: SafeArea(
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 640),
+              constraints: const BoxConstraints(maxWidth: 1040),
               child: PersonView(handle: handle, preview: preview, source: source, onBack: () => Navigator.of(context).pop()),
             ),
           ),
@@ -142,6 +144,7 @@ class _PersonViewState extends State<PersonView> {
             padding: EdgeInsets.zero,
             children: [
               _Cover(
+                person: p,
                 onBack: widget.onBack,
                 onShare: () => SharePlus.instance.share(ShareParams(text: '${p.name} on CrewMatch: ${profileLink(_key)}')),
               ),
@@ -149,48 +152,7 @@ class _PersonViewState extends State<PersonView> {
                 offset: const Offset(0, -48),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    spacing: 6,
-                    children: [
-                      PopIn(
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(color: Palette.desktop, shape: BoxShape.circle),
-                          child: Avatar(url: p.avatar, name: p.name, size: 96, background: Palette.pink),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(p.name, style: AppType.title(size: 26)),
-                      Text(
-                        [if (p.role != null) optionLabel(p.role!), if (p.experienceLevel != null) optionLabel(p.experienceLevel!)].join(' · '),
-                        style: AppType.body(size: 14, color: Palette.muted),
-                      ),
-                      InfoTag(crewStatus(p), color: Palette.strip, textColor: p.crewName == null ? Palette.link : Palette.ink),
-                      if (p.headline.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(p.headline, style: AppType.body(size: 16, height: 1.5)),
-                      ],
-                      const SizedBox(height: 10),
-                      if (!_isMe && p.score != null) Rise(child: _FitCard(person: p)),
-                      if (p.clubs.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: [
-                            for (final c in p.clubs) ClubChip(c, onTap: () => Navigator.of(context).push(ClubScreen.route(c.id))),
-                          ],
-                        ),
-                      ],
-                      if (p.skills.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Wrap(spacing: 8, runSpacing: 8, children: [for (final s in p.skills) Chip(label: Text(s))]),
-                      ],
-                      const SizedBox(height: 10),
-                      _LinkRow(link: profileLink(_key), copied: _copied, onCopy: _copy),
-                    ],
-                  ),
+                  child: LayoutBuilder(builder: (context, box) => _body(p, wide: box.maxWidth >= 720)),
                 ),
               ),
             ],
@@ -203,6 +165,88 @@ class _PersonViewState extends State<PersonView> {
             duration: Motion.of(context, const Duration(milliseconds: 250)),
             child: KeyedSubtree(key: ValueKey((_isMe, p.relation)), child: _action(p, first)),
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _body(User p, {required bool wide}) {
+    final about = p.bio.isNotEmpty && p.bio != p.headline ? p.bio : null;
+    final header = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      spacing: 6,
+      children: [
+        PopIn(
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: const BoxDecoration(color: Palette.desktop, shape: BoxShape.circle),
+            child: Avatar(url: p.avatar, name: p.name, size: wide ? 112 : 96, background: Palette.pink),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          spacing: 10,
+          children: [
+            Flexible(child: Text(p.name, style: AppType.title(size: wide ? 30 : 26))),
+            if (p.demo) const DemoBadge(),
+            if (!_isMe && p.score != null) InfoTag('${p.score}% fit', color: Palette.gold, textColor: Palette.onGold),
+          ],
+        ),
+        Text(
+          [if (p.role != null) optionLabel(p.role!), if (p.experienceLevel != null) optionLabel(p.experienceLevel!)].join(' · '),
+          style: AppType.body(size: 14, color: Palette.muted),
+        ),
+        InfoTag(crewStatus(p), color: Palette.strip, textColor: p.crewName == null ? Palette.link : Palette.ink),
+        if (p.headline.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(p.headline, style: AppType.body(size: 17, height: 1.5)),
+        ],
+      ],
+    );
+    Widget chips(List<String> items, Color color, Color text) => Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [for (final i in items) InfoTag(optionLabel(i), color: color, textColor: text)],
+        );
+    final main = [
+      if (about != null) DetailSection(title: 'About', children: [Text(about, style: AppType.body(size: 15.5, height: 1.55))]),
+      if (!_isMe) WhyFitSection(p),
+      WorkStyleSection(p, compare: !_isMe),
+    ];
+    final side = [
+      RecordSection(p),
+      if (p.clubs.isNotEmpty)
+        DetailSection(title: 'Clubs', children: [
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [for (final c in p.clubs) ClubChip(c, onTap: () => Navigator.of(context).push(ClubScreen.route(c.id)))],
+          ),
+        ]),
+      if (p.superpowers.isNotEmpty) DetailSection(title: 'Superpowers', children: [chips(p.superpowers, Palette.navy, Palette.cream)]),
+      if (p.skills.isNotEmpty) DetailSection(title: 'Skills', children: [chips(p.skills, Palette.strip, Palette.ink)]),
+      if (p.interests.isNotEmpty) DetailSection(title: 'Interests', children: [chips(p.interests, Palette.pink, Palette.onPink)]),
+      _LinkRow(link: profileLink(_key), copied: _copied, onCopy: _copy),
+    ];
+    Widget column(List<Widget> items) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 26, children: items);
+    Widget card(List<Widget> items) => Container(
+          padding: const EdgeInsets.all(20),
+          decoration: const BoxDecoration(color: Palette.window, borderRadius: Frame.radius, border: Frame.border),
+          child: column(items),
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 24,
+      children: [
+        header,
+        Rise(
+          child: wide
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  spacing: 20,
+                  children: [Expanded(flex: 6, child: card(main)), Expanded(flex: 5, child: card(side))],
+                )
+              : column([...main, ...side]),
         ),
       ],
     );
@@ -276,81 +320,38 @@ class _PersonViewState extends State<PersonView> {
 }
 
 class _Cover extends StatelessWidget {
-  const _Cover({required this.onBack, required this.onShare});
+  const _Cover({required this.person, required this.onBack, required this.onShare});
 
+  final User person;
   final VoidCallback? onBack;
   final VoidCallback onShare;
 
+  static final _scrim = IconButton.styleFrom(backgroundColor: const Color(0x59000000));
+
   @override
   Widget build(BuildContext context) => SizedBox(
-        height: 140,
-        child: Stack(
-          clipBehavior: Clip.hardEdge,
-          children: [
-            const Positioned.fill(child: ColoredBox(color: Palette.navy)),
-            Positioned(right: -40, top: -60, child: _Blob(200, Palette.gold.withValues(alpha: .25))),
-            Positioned(left: 120, bottom: -80, child: _Blob(150, Palette.crimson.withValues(alpha: .45))),
-            Positioned(
-              left: 4,
-              right: 4,
-              top: 4,
-              child: Row(
-                children: [
-                  if (onBack != null)
-                    IconButton(tooltip: 'Back', onPressed: onBack, icon: const Icon(Icons.arrow_back_rounded, color: Palette.cream)),
-                  const Spacer(),
-                  IconButton(tooltip: 'Share profile', onPressed: onShare, icon: const Icon(Icons.share_rounded, color: Palette.cream)),
-                ],
+        height: 170,
+        child: DecoratedBox(
+          decoration: CardStyle.cover(person.cover, photoUrl: person.coverUrl),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (person.coverUrl == null) const CustomPaint(painter: DotsPainter()),
+              Positioned(
+                left: 10,
+                right: 10,
+                top: 10,
+                child: Row(
+                  children: [
+                    if (onBack != null)
+                      IconButton(tooltip: 'Back', onPressed: onBack, style: _scrim, icon: const Icon(Icons.arrow_back_rounded, color: Colors.white)),
+                    const Spacer(),
+                    IconButton(tooltip: 'Share profile', onPressed: onShare, style: _scrim, icon: const Icon(Icons.share_rounded, color: Colors.white)),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
-      );
-}
-
-class _Blob extends StatelessWidget {
-  const _Blob(this.size, this.color);
-
-  final double size;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) =>
-      Container(width: size, height: size, decoration: BoxDecoration(color: color, shape: BoxShape.circle));
-}
-
-class _FitCard extends StatelessWidget {
-  const _FitCard({required this.person});
-
-  final User person;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: Palette.window, borderRadius: Frame.radius, border: Frame.border),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          spacing: 8,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              spacing: 8,
-              children: [
-                Text('${person.score}%', style: AppType.title(size: 30)),
-                Flexible(child: Text('fit with your crew', style: AppType.body(size: 14, color: Palette.muted))),
-              ],
-            ),
-            for (final tag in person.tags)
-              Row(
-                spacing: 8,
-                children: [
-                  const Icon(Icons.check_rounded, size: 18, color: Palette.link),
-                  Expanded(child: Text(tag, style: AppType.body(size: 14))),
-                ],
-              ),
-          ],
+            ],
+          ),
         ),
       );
 }

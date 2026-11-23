@@ -20,15 +20,12 @@ class FitDetails extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final me = context.session.user;
-    final b = person.breakdown;
-    final r = person.record;
     final about = person.bio.isNotEmpty ? person.bio : person.headline;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       spacing: 26,
       children: [
-        _Section(
+        DetailSection(
           title: 'About',
           children: [
             if (about.isNotEmpty) Text(about, style: AppType.body(size: 15.5, height: 1.55)),
@@ -39,49 +36,11 @@ class FitDetails extends StatelessWidget {
             ),
           ],
         ),
-        if (b != null)
-          _Section(
-            title: 'Why ${person.score ?? b.skills + b.style + b.interests}%',
-            children: [
-              _Bar(label: 'Complementary skills', value: b.skills, max: 50, delay: 0),
-              _Bar(label: 'Work style', value: b.style, max: 30, delay: 1),
-              _Bar(label: 'Shared interests', value: b.interests, max: 20, delay: 2),
-              if (b.clubs > 0) _Reason('Same club · +${b.clubs}'),
-              for (final t in person.tags.where((t) => t != 'In your club')) _Reason(t),
-            ],
-          ),
-        if (person.schedule != null || person.commitment != null || person.communication != null)
-          _Section(
-            title: 'Work style',
-            children: [
-              _StyleRow(Icons.schedule_rounded, 'Schedule', person.schedule, me?.schedule),
-              _StyleRow(Icons.flag_rounded, 'Commitment', person.commitment, me?.commitment),
-              _StyleRow(Icons.forum_rounded, 'Talks by', person.communication, me?.communication),
-            ],
-          ),
-        _Section(
-          title: 'Hackathon record',
-          children: [
-            Row(
-              spacing: 10,
-              children: [
-                _Tile(value: r?.events ?? 0, label: 'Events'),
-                _Tile(value: r?.challenges ?? 0, label: 'Challenges'),
-                _Tile(value: r?.points ?? 0, label: 'Points'),
-              ],
-            ),
-            Text(
-              switch (r) {
-                HackRecord(lastTitle: final t?, lastAt: final at?) => 'Last: $t · ${timeAgo(at, DateTime.now())}',
-                _ when person.crewName == null => 'No events yet. A fresh start.',
-                _ => 'Nothing finished with ${person.crewName} yet.',
-              },
-              style: AppType.body(size: 13, color: Palette.muted),
-            ),
-          ],
-        ),
+        WhyFitSection(person),
+        WorkStyleSection(person),
+        RecordSection(person),
         if (similar.isNotEmpty)
-          _Section(
+          DetailSection(
             title: 'Similar people',
             children: [
               Row(
@@ -96,8 +55,87 @@ class FitDetails extends StatelessWidget {
   }
 }
 
-class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.children});
+/// "Why 86%": the three score bars and the reasons. Empty without a breakdown.
+class WhyFitSection extends StatelessWidget {
+  const WhyFitSection(this.person, {super.key});
+
+  final User person;
+
+  @override
+  Widget build(BuildContext context) {
+    final b = person.breakdown;
+    if (b == null) return const SizedBox.shrink();
+    return DetailSection(
+      title: 'Why ${person.score ?? b.skills + b.style + b.interests}%',
+      children: [
+        _Bar(label: 'Complementary skills', value: b.skills, max: 50, delay: 0),
+        _Bar(label: 'Work style', value: b.style, max: 30, delay: 1),
+        _Bar(label: 'Shared interests', value: b.interests, max: 20, delay: 2),
+        if (b.clubs > 0) _Reason('Same club · +${b.clubs}'),
+        for (final t in person.tags.where((t) => t != 'In your club')) _Reason(t),
+      ],
+    );
+  }
+}
+
+/// Schedule, commitment and how they talk, marked where they match yours.
+class WorkStyleSection extends StatelessWidget {
+  const WorkStyleSection(this.person, {super.key, this.compare = true});
+
+  final User person;
+  final bool compare;
+
+  @override
+  Widget build(BuildContext context) {
+    final me = compare ? context.session.user : null;
+    if (person.schedule == null && person.commitment == null && person.communication == null) return const SizedBox.shrink();
+    return DetailSection(
+      title: 'Work style',
+      children: [
+        _StyleRow(Icons.schedule_rounded, 'Schedule', person.schedule, me?.schedule),
+        _StyleRow(Icons.flag_rounded, 'Commitment', person.commitment, me?.commitment),
+        _StyleRow(Icons.forum_rounded, 'Talks by', person.communication, me?.communication),
+      ],
+    );
+  }
+}
+
+/// Events, challenges and points their crew finished, and the latest one.
+class RecordSection extends StatelessWidget {
+  const RecordSection(this.person, {super.key});
+
+  final User person;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = person.record;
+    return DetailSection(
+      title: 'Hackathon record',
+      children: [
+        Row(
+          spacing: 10,
+          children: [
+            _Tile(value: r?.events ?? 0, label: 'Events'),
+            _Tile(value: r?.challenges ?? 0, label: 'Challenges'),
+            _Tile(value: r?.points ?? 0, label: 'Points'),
+          ],
+        ),
+        Text(
+          switch (r) {
+            HackRecord(lastTitle: final t?, lastAt: final at?) => 'Last: $t · ${timeAgo(at, DateTime.now())}',
+            _ when person.crewName == null => 'No events yet. A fresh start.',
+            _ => 'Nothing finished with ${person.crewName} yet.',
+          },
+          style: AppType.body(size: 13, color: Palette.muted),
+        ),
+      ],
+    );
+  }
+}
+
+/// A bold title over its content.
+class DetailSection extends StatelessWidget {
+  const DetailSection({super.key, required this.title, required this.children});
 
   final String title;
   final List<Widget> children;
