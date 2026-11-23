@@ -269,14 +269,9 @@ class _FitPanel extends StatelessWidget {
   final VoidCallback onRequest;
 
   @override
-  Widget build(BuildContext context) => Rise(
-        child: Container(
-          decoration: const BoxDecoration(color: Palette.window, borderRadius: Frame.radius, border: Frame.border),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: FitDetails(person: person, similar: similar, onRequest: onRequest),
-          ),
-        ),
+  Widget build(BuildContext context) => SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: FitDetails(person: person, similar: similar, onRequest: onRequest),
       );
 }
 
