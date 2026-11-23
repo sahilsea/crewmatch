@@ -3,7 +3,8 @@ import User from '../models/User.js';
 import Crew from '../models/Crew.js';
 import Club from '../models/Club.js';
 import TeamRequest from '../models/TeamRequest.js';
-import { compatibility, reasonTags } from '../utils/matching.js';
+import { breakdown, reasonTags } from '../utils/matching.js';
+import { recordsFor } from '../utils/record.js';
 import { HttpError } from '../middleware/error.js';
 import { teamFor } from './deckController.js';
 
@@ -60,10 +61,11 @@ async function relations(me, users) {
 
 // A person as the app shows them: public fields, fit with my team, crew, and where we stand.
 export async function present(me, users) {
-  const [team, crews, rel, clubTags] = await Promise.all([teamFor(me), crewNames(users), relations(me, users), clubsOf(users)]);
+  const [team, crews, rel, clubTags, records] = await Promise.all([teamFor(me), crewNames(users), relations(me, users), clubsOf(users), recordsFor(users)]);
   return users.map((u) => ({
     ...u.toPublic(),
-    score: compatibility(team, u),
+    ...((fit) => ({ score: fit.total, breakdown: { skills: fit.skills, style: fit.style, interests: fit.interests, clubs: fit.clubs } }))(breakdown(team, u)),
+    record: records[u.id],
     tags: reasonTags(team, u),
     crewName: crews[u.id] ?? null,
     clubs: (u.clubs ?? []).map((id) => clubTags[id.toString()]).filter(Boolean),

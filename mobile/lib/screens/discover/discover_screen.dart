@@ -8,9 +8,8 @@ import '../../models/deck.dart';
 import '../../models/user.dart';
 import '../../state/session.dart';
 import '../../ui/ui.dart';
-import '../../util/labels.dart';
 import '../shell/app_tab.dart';
-import '../matches/person_activity.dart';
+import 'fit_details.dart';
 import 'match_dialog.dart';
 import 'swipe_stack.dart';
 
@@ -133,7 +132,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                               SizedBox(width: 440, child: _deckColumn(deck)),
                               const SizedBox(width: 28),
                               Expanded(
-                                child: _FitPanel(key: ValueKey(deck.first.id), person: deck.first),
+                                child: _FitPanel(
+                                  key: ValueKey(deck.first.id),
+                                  person: deck.first,
+                                  similar: _similar(deck),
+                                  onRequest: _requestTop,
+                                ),
                               ),
                             ],
                           )
@@ -154,6 +158,14 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       Expanded(
         child: SwipeStack(key: _stack, cards: deck, seen: _seen, total: _total, onSwiped: _onSwiped),
       ),
+      if (!widget.wide)
+        Center(
+          child: TextButton.icon(
+            onPressed: () => showFitDetails(context, person: deck.first, similar: _similar(deck), onRequest: _requestTop),
+            icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+            label: const Text('Why they fit and more'),
+          ),
+        ),
       Row(
         mainAxisAlignment: MainAxisAlignment.center,
         spacing: 28,
@@ -179,6 +191,16 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       ),
     ],
   );
+
+  /// A right swipe sends the team-up request.
+  void _requestTop() => _stack.currentState?.swipe(SwipeDirection.right);
+
+  /// Others in the deck who share the top card's role, then the next best.
+  List<User> _similar(List<User> deck) {
+    final top = deck.first;
+    final rest = deck.skip(1).toList();
+    return [...rest.where((p) => p.role == top.role), ...rest.where((p) => p.role != top.role)].take(3).toList();
+  }
 
   void _retry() {
     setState(() => _error = null);
@@ -238,57 +260,24 @@ class _EmptyDeck extends StatelessWidget {
 
 /// Beside the card on wide screens: everything about the person on top, so
 /// you can decide without flipping anything.
+/// Wide screens: the top card's details beside the deck.
 class _FitPanel extends StatelessWidget {
-  const _FitPanel({super.key, required this.person});
+  const _FitPanel({super.key, required this.person, required this.similar, required this.onRequest});
 
   final User person;
+  final List<User> similar;
+  final VoidCallback onRequest;
 
   @override
-  Widget build(BuildContext context) {
-    Widget section(String title, List<Widget> children) => Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: 10,
-      children: [
-        Text(title, style: AppType.body(size: 16, weight: FontWeight.w700)),
-        ...children,
-      ],
-    );
-    Widget chips(List<String> items, Color color, Color text) => Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [for (final i in items) InfoTag(optionLabel(i), color: color, textColor: text)],
-    );
-    return Rise(
-      child: Container(
-        decoration: const BoxDecoration(color: Palette.window, borderRadius: Frame.radius, border: Frame.border),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            spacing: 22,
-            children: [
-              if (person.tags.isNotEmpty)
-                section('Why they fit', [
-                  for (final tag in person.tags)
-                    Row(
-                      spacing: 8,
-                      children: [
-                        const Icon(Icons.check_circle_rounded, size: 18, color: Palette.gold),
-                        Expanded(child: Text(tag, style: AppType.body(size: 15))),
-                      ],
-                    ),
-                ]),
-              if (person.bio.isNotEmpty) section('About', [Text(person.bio, style: AppType.body(size: 16, height: 1.55))]),
-              if (person.superpowers.isNotEmpty) section('Superpowers', [chips(person.superpowers, Palette.navy, Palette.cream)]),
-              if (person.skills.isNotEmpty) section('Skills', [chips(person.skills, Palette.strip, Palette.ink)]),
-              if (person.interests.isNotEmpty) section('Interests', [chips(person.interests, Palette.pink, Palette.onPink)]),
-              PersonActivity(userId: person.id),
-            ],
+  Widget build(BuildContext context) => Rise(
+        child: Container(
+          decoration: const BoxDecoration(color: Palette.window, borderRadius: Frame.radius, border: Frame.border),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: FitDetails(person: person, similar: similar, onRequest: onRequest),
           ),
         ),
-      ),
-    );
-  }
+      );
 }
 
 /// Why people are in this order: the three parts of the fit score.

@@ -982,6 +982,25 @@ describe('clubs', () => {
   });
 });
 
+describe('discover details', () => {
+  test('deck cards carry the fit breakdown, clubs, crew and hackathon record', async () => {
+    const web = await login('web@crewmatch.dev');
+    const { deck } = (await api('GET', '/deck', { token: web })).body;
+    assert.ok(deck.length > 0);
+    for (const c of deck) {
+      const b = c.breakdown;
+      assert.ok(b.skills <= 50 && b.style <= 30 && b.interests <= 20 && b.clubs <= 6, c.name);
+      assert.ok(Math.abs(b.skills + b.style + b.interests + b.clubs - c.score) <= 2, `${c.name} parts add up`);
+      assert.deepEqual(Object.keys(c.record).sort(), ['challenges', 'events', 'last', 'points']);
+      assert.ok(Array.isArray(c.clubs));
+    }
+    const crewed = deck.find((c) => c.crewName);
+    if (crewed) assert.ok(crewed.record.points >= 0);
+    const scored = deck.find((c) => c.record.points > 0);
+    if (scored) assert.ok(scored.record.last.title.length > 0);
+  });
+});
+
 describe('CORS', () => {
   const allowOrigin = async (origin) =>
     (await api('GET', '/health', { headers: { origin } })).headers.get('access-control-allow-origin');

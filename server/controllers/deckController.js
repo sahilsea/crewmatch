@@ -28,11 +28,15 @@ export async function getDeck(req, res) {
     isAdmin: false,
   });
 
-  const deck = candidates
-    .map((c) => ({ ...c.toPublic(), score: compatibility(team, c), tags: reasonTags(team, c) }))
+  const top = candidates
+    .map((c) => ({ user: c, score: compatibility(team, c) }))
     .filter((c) => c.score >= MIN_DECK_SCORE)
     .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+    .slice(0, limit)
+    .map((c) => c.user);
+  // Everything the card and the details panel show: fit breakdown, clubs, crew, record.
+  const { present } = await import('./requestController.js');
+  const deck = await present(me, top);
 
   res.json({ scoredAgainst: team.length > 1 ? 'crew' : 'you', count: deck.length, deck });
 }
