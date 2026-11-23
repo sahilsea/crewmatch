@@ -17,17 +17,14 @@ import 'card_preview_screen.dart';
 class CardEditorScreen extends StatefulWidget {
   const CardEditorScreen({super.key});
 
-  static Route<void> route() =>
-      MaterialPageRoute(builder: (_) => const CardEditorScreen());
+  static Route<void> route() => MaterialPageRoute(builder: (_) => const CardEditorScreen());
 
   @override
   State<CardEditorScreen> createState() => _CardEditorScreenState();
 }
 
 class _CardEditorScreenState extends State<CardEditorScreen> {
-  late final _headline = TextEditingController(
-    text: context.session.user?.headline ?? '',
-  );
+  late final _headline = TextEditingController(text: context.session.user?.headline ?? '');
   late String _cover = context.session.user?.cover ?? 'dusk';
   late String _accent = context.session.user?.accent ?? 'crimson';
   late Set<String> _fields = {...?context.session.user?.cardFields};
@@ -61,11 +58,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
 
   Future<String?> _pick(ImageSource source) async {
     try {
-      final file = await ImagePicker().pickImage(
-        source: source,
-        maxWidth: 1200,
-        imageQuality: 82,
-      );
+      final file = await ImagePicker().pickImage(source: source, maxWidth: 1200, imageQuality: 82);
       if (file == null) return null;
       final bytes = await file.readAsBytes();
       if (bytes.length > 3 * 1024 * 1024) {
@@ -74,20 +67,11 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
         }
         return null;
       }
-      final type =
-          file.mimeType ??
-          (file.name.toLowerCase().endsWith('.png')
-              ? 'image/png'
-              : 'image/jpeg');
+      final type = file.mimeType ?? (file.name.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg');
       return 'data:$type;base64,${base64Encode(bytes)}';
     } catch (_) {
       if (mounted) {
-        showNotice(
-          context,
-          source == ImageSource.camera
-              ? "Couldn't open the camera"
-              : "Couldn't open your photos",
-        );
+        showNotice(context, source == ImageSource.camera ? "Couldn't open the camera" : "Couldn't open your photos");
       }
       return null;
     }
@@ -148,9 +132,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
     if (!mounted || choice == null) return;
     final api = context.api;
     if (choice == 'remove') return _upload(api.removeAvatar, 'Photo removed');
-    final photo = await _pick(
-      choice == 'camera' ? ImageSource.camera : ImageSource.gallery,
-    );
+    final photo = await _pick(choice == 'camera' ? ImageSource.camera : ImageSource.gallery);
     if (photo != null) {
       await _upload(() => api.uploadAvatar(photo), 'Profile picture updated');
     }
@@ -221,25 +203,14 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                         IconButton(
                           tooltip: 'Back',
                           onPressed: () => Navigator.maybePop(context),
-                          icon: const Icon(
-                            Icons.arrow_back_rounded,
-                            color: Palette.ink,
-                          ),
+                          icon: const Icon(Icons.arrow_back_rounded, color: Palette.ink),
                         ),
                         Expanded(
-                          child: Semantics(
-                            header: true,
-                            child: Text(
-                              'Your card',
-                              style: AppType.title(size: 22),
-                            ),
-                          ),
+                          child: Semantics(header: true, child: Text('Your card', style: AppType.title(size: 22))),
                         ),
                         FilledButton(
                           onPressed: dirty && !_saving ? () => _save(me) : null,
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(80, 40),
-                          ),
+                          style: FilledButton.styleFrom(minimumSize: const Size(80, 40)),
                           child: Text(_saving ? 'Saving…' : 'Save'),
                         ),
                       ],
@@ -264,17 +235,9 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                           width: 358,
                           height: 520,
                           child: AnimatedSwitcher(
-                            duration: Motion.of(
-                              context,
-                              const Duration(milliseconds: 250),
-                            ),
+                            duration: Motion.of(context, const Duration(milliseconds: 250)),
                             child: ProfileCard(
-                              key: ValueKey((
-                                draft.cover,
-                                draft.accent,
-                                me.avatar,
-                                me.coverUrl,
-                              )),
+                              key: ValueKey((draft.cover, draft.accent, me.avatar, me.coverUrl)),
                               person: draft,
                               fitLabel: 'Your fit shows here',
                             ),
@@ -288,10 +251,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                       padding: const EdgeInsets.fromLTRB(20, 18, 20, 96),
                       children: [
                         if (_uploading)
-                          const Padding(
-                            padding: EdgeInsets.only(bottom: 12),
-                            child: LinearProgressIndicator(),
-                          ),
+                          const Padding(padding: EdgeInsets.only(bottom: 12), child: LinearProgressIndicator()),
                         _Section(
                           title: 'Profile picture',
                           child: Row(
@@ -301,18 +261,11 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                                 button: true,
                                 label: 'Change profile picture',
                                 child: GestureDetector(
-                                  onTap: _uploading
-                                      ? null
-                                      : () => _photoSheet(me),
+                                  onTap: _uploading ? null : () => _photoSheet(me),
                                   child: Stack(
                                     clipBehavior: Clip.none,
                                     children: [
-                                      Avatar(
-                                        url: me.avatar,
-                                        name: me.name,
-                                        size: 72,
-                                        background: Palette.gold,
-                                      ),
+                                      Avatar(url: me.avatar, name: me.name, size: 72, background: Palette.gold),
                                       Positioned(
                                         right: -2,
                                         bottom: -2,
@@ -322,10 +275,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                                           decoration: BoxDecoration(
                                             color: Palette.crimson,
                                             shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: Palette.desktop,
-                                              width: 3,
-                                            ),
+                                            border: Border.all(color: Palette.desktop, width: 3),
                                           ),
                                           child: const Icon(
                                             Icons.photo_camera_outlined,
@@ -344,20 +294,12 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                                   spacing: 2,
                                   children: [
                                     Text(
-                                      me.avatar.isEmpty
-                                          ? 'Add a photo'
-                                          : 'Looking good',
-                                      style: AppType.body(
-                                        size: 15,
-                                        weight: FontWeight.w500,
-                                      ),
+                                      me.avatar.isEmpty ? 'Add a photo' : 'Looking good',
+                                      style: AppType.body(size: 15, weight: FontWeight.w500),
                                     ),
                                     Text(
                                       'Shows on your card, matches and chat',
-                                      style: AppType.body(
-                                        size: 13,
-                                        color: Palette.muted,
-                                      ),
+                                      style: AppType.body(size: 13, color: Palette.muted),
                                     ),
                                   ],
                                 ),
@@ -372,8 +314,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
                               itemCount: CardStyle.covers.length,
-                              separatorBuilder: (_, _) =>
-                                  const SizedBox(width: 10),
+                              separatorBuilder: (_, _) => const SizedBox(width: 10),
                               itemBuilder: (context, i) {
                                 final (id, label) = CardStyle.covers[i];
                                 final on = _cover == id;
@@ -382,61 +323,37 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                                   selected: on,
                                   label: '$label cover',
                                   child: GestureDetector(
-                                    onTap: _uploading
-                                        ? null
-                                        : () => _pickCover(me, id),
+                                    onTap: _uploading ? null : () => _pickCover(me, id),
                                     child: Column(
                                       spacing: 6,
                                       children: [
                                         AnimatedContainer(
-                                          duration: Motion.of(
-                                            context,
-                                            const Duration(milliseconds: 200),
-                                          ),
+                                          duration: Motion.of(context, const Duration(milliseconds: 200)),
                                           width: 92,
                                           height: 60,
                                           decoration: BoxDecoration(
                                             borderRadius: Frame.buttonRadius,
                                             border: Border.all(
-                                              color: on
-                                                  ? Palette.gold
-                                                  : Palette.border,
+                                              color: on ? Palette.gold : Palette.border,
                                               width: on ? 3 : 1,
                                             ),
                                           ),
                                           child: ClipRRect(
-                                            borderRadius:
-                                                const BorderRadius.all(
-                                                  Radius.circular(9),
-                                                ),
-                                            child:
-                                                id == 'photo' &&
-                                                    me.coverUrl == null
+                                            borderRadius: const BorderRadius.all(Radius.circular(9)),
+                                            child: id == 'photo' && me.coverUrl == null
                                                 ? const ColoredBox(
                                                     color: Palette.strip,
                                                     child: Center(
                                                       child: Icon(
-                                                        Icons
-                                                            .add_photo_alternate_outlined,
+                                                        Icons.add_photo_alternate_outlined,
                                                         color: Palette.muted,
                                                       ),
                                                     ),
                                                   )
-                                                : DecoratedBox(
-                                                    decoration: CardStyle.cover(
-                                                      id,
-                                                      photoUrl: me.coverUrl,
-                                                    ),
-                                                  ),
+                                                : DecoratedBox(decoration: CardStyle.cover(id, photoUrl: me.coverUrl)),
                                           ),
                                         ),
-                                        Text(
-                                          label,
-                                          style: AppType.body(
-                                            size: 12,
-                                            weight: FontWeight.w500,
-                                          ),
-                                        ),
+                                        Text(label, style: AppType.body(size: 12, weight: FontWeight.w500)),
                                       ],
                                     ),
                                   ),
@@ -453,15 +370,10 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                             minLines: 2,
                             maxLines: 3,
                             onChanged: (_) => setState(() {}),
-                            decoration: const InputDecoration(
-                              hintText: 'What do you bring to a crew?',
-                            ),
+                            decoration: const InputDecoration(hintText: 'What do you bring to a crew?'),
                           ),
                         ),
-                        _Section(
-                          title: 'Your clubs',
-                          child: _ClubsRow(),
-                        ),
+                        _Section(title: 'Your clubs', child: _ClubsRow()),
                         _Section(
                           title: 'Show on your card',
                           child: Column(
@@ -486,10 +398,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                               ),
                               Text(
                                 'Your name, role and fit always show.',
-                                style: AppType.body(
-                                  size: 12,
-                                  color: Palette.muted,
-                                ),
+                                style: AppType.body(size: 12, color: Palette.muted),
                               ),
                             ],
                           ),
@@ -499,8 +408,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                           child: Row(
                             spacing: 14,
                             children: [
-                              for (final MapEntry(key: id, value: (color, _))
-                                  in CardStyle.accents.entries)
+                              for (final MapEntry(key: id, value: (color, _)) in CardStyle.accents.entries)
                                 Semantics(
                                   button: true,
                                   selected: _accent == id,
@@ -508,19 +416,14 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                                   child: GestureDetector(
                                     onTap: () => setState(() => _accent = id),
                                     child: AnimatedContainer(
-                                      duration: Motion.of(
-                                        context,
-                                        const Duration(milliseconds: 200),
-                                      ),
+                                      duration: Motion.of(context, const Duration(milliseconds: 200)),
                                       width: 40,
                                       height: 40,
                                       decoration: BoxDecoration(
                                         color: color,
                                         shape: BoxShape.circle,
                                         border: Border.all(
-                                          color: _accent == id
-                                              ? Palette.ink
-                                              : Palette.border,
+                                          color: _accent == id ? Palette.ink : Palette.border,
                                           width: _accent == id ? 3 : 1,
                                         ),
                                       ),
@@ -545,14 +448,10 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
             width: double.infinity,
             child: FilledButton.icon(
               onPressed: () async {
-                final looksGood = await Navigator.of(context)
-                    .push(CardPreviewScreen.route(draft));
+                final looksGood = await Navigator.of(context).push(CardPreviewScreen.route(draft));
                 if (looksGood == true && mounted && _dirty(me)) await _save(me);
               },
-              style: FilledButton.styleFrom(
-                backgroundColor: Palette.navy,
-                foregroundColor: Palette.cream,
-              ),
+              style: FilledButton.styleFrom(backgroundColor: Palette.navy, foregroundColor: Palette.cream),
               icon: const Icon(Icons.visibility_outlined),
               label: const Text('See it as others do'),
             ),
@@ -586,12 +485,7 @@ class _Section extends StatelessWidget {
 }
 
 class _SheetItem extends StatelessWidget {
-  const _SheetItem({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.color = Palette.ink,
-  });
+  const _SheetItem({required this.icon, required this.label, required this.onTap, this.color = Palette.ink});
 
   final IconData icon;
   final String label;
@@ -636,7 +530,10 @@ class _ClubsRowState extends State<_ClubsRow> {
   @override
   Widget build(BuildContext context) {
     final ids = SessionScope.watch(context).user?.clubIds ?? const [];
-    final mine = [for (final c in _clubs ?? <Club>[]) if (ids.contains(c.id)) c];
+    final mine = [
+      for (final c in _clubs ?? <Club>[])
+        if (ids.contains(c.id)) c,
+    ];
     return Wrap(
       spacing: 8,
       runSpacing: 8,

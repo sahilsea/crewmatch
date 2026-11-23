@@ -14,8 +14,7 @@ class CardPreviewScreen extends StatefulWidget {
   final User me;
 
   /// Resolves to true for 'Looks good', which saves the card.
-  static Route<bool> route(User me) =>
-      MaterialPageRoute(builder: (_) => CardPreviewScreen(me: me));
+  static Route<bool> route(User me) => MaterialPageRoute(builder: (_) => CardPreviewScreen(me: me));
 
   @override
   State<CardPreviewScreen> createState() => _CardPreviewScreenState();
@@ -44,18 +43,12 @@ class _CardPreviewScreenState extends State<CardPreviewScreen> {
                       IconButton(
                         tooltip: 'Back to editing',
                         onPressed: () => Navigator.pop(context),
-                        icon: const Icon(
-                          Icons.arrow_back_rounded,
-                          color: Palette.ink,
-                        ),
+                        icon: const Icon(Icons.arrow_back_rounded, color: Palette.ink),
                       ),
                       Expanded(
                         child: Semantics(
                           header: true,
-                          child: Text(
-                            'How others see you',
-                            style: AppType.title(size: 22),
-                          ),
+                          child: Text('How others see you', style: AppType.title(size: 22)),
                         ),
                       ),
                     ],
@@ -82,10 +75,7 @@ class _CardPreviewScreenState extends State<CardPreviewScreen> {
                 ),
                 Expanded(
                   child: AnimatedSwitcher(
-                    duration: Motion.of(
-                      context,
-                      const Duration(milliseconds: 300),
-                    ),
+                    duration: Motion.of(context, const Duration(milliseconds: 300)),
                     switchInCurve: Motion.ease,
                     child: KeyedSubtree(
                       key: ValueKey(_tab),
@@ -105,9 +95,7 @@ class _CardPreviewScreenState extends State<CardPreviewScreen> {
                       Expanded(
                         child: OutlinedButton(
                           onPressed: () => Navigator.pop(context, false),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size(0, 52),
-                          ),
+                          style: OutlinedButton.styleFrom(minimumSize: const Size(0, 52)),
                           child: const Text('Edit'),
                         ),
                       ),
@@ -135,8 +123,7 @@ class _CardPreviewScreenState extends State<CardPreviewScreen> {
       children: [
         Expanded(
           child: GestureDetector(
-            onPanUpdate: (d) =>
-                setState(() => _dx = (_dx + d.delta.dx).clamp(-120, 120)),
+            onPanUpdate: (d) => setState(() => _dx = (_dx + d.delta.dx).clamp(-120, 120)),
             onPanEnd: (_) => setState(() => _dx = 0),
             child: TweenAnimationBuilder<double>(
               tween: Tween(end: _dx),
@@ -150,77 +137,57 @@ class _CardPreviewScreenState extends State<CardPreviewScreen> {
             ),
           ),
         ),
-        Text(
-          'Try dragging it: this is what people swipe on.',
-          style: AppType.body(size: 13, color: Palette.muted),
-        ),
+        Text('Try dragging it: this is what people swipe on.', style: AppType.body(size: 13, color: Palette.muted)),
       ],
     ),
   );
 
   Widget _matches(User me, Color accent) {
-    Widget row(String name, String sub, Widget face, {bool mine = false}) =>
-        Opacity(
-          opacity: mine ? 1 : 0.45,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            decoration: mine
-                ? BoxDecoration(
-                    color: Palette.strip,
-                    borderRadius: Frame.radius,
-                    border: Border.all(color: Palette.gold, width: 2),
-                  )
-                : null,
-            child: Row(
-              spacing: 12,
-              children: [
-                face,
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        style: AppType.body(size: 16, weight: FontWeight.w500),
-                      ),
-                      Text(
-                        sub,
-                        style: AppType.body(size: 13, color: Palette.muted),
-                      ),
-                    ],
-                  ),
-                ),
-                if (mine)
-                  OutlinedButton(
-                    onPressed: () {},
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(64, 36),
-                    ),
-                    child: const Text('Add'),
-                  ),
-              ],
+    Widget row(String name, String sub, Widget face, {bool mine = false}) => Opacity(
+      opacity: mine ? 1 : 0.45,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: mine
+            ? BoxDecoration(
+                color: Palette.strip,
+                borderRadius: Frame.radius,
+                border: Border.all(color: Palette.gold, width: 2),
+              )
+            : null,
+        child: Row(
+          spacing: 12,
+          children: [
+            face,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name, style: AppType.body(size: 16, weight: FontWeight.w500)),
+                  Text(sub, style: AppType.body(size: 13, color: Palette.muted)),
+                ],
+              ),
             ),
-          ),
-        );
+            if (mine)
+              OutlinedButton(
+                onPressed: () {},
+                style: OutlinedButton.styleFrom(minimumSize: const Size(64, 36)),
+                child: const Text('Add'),
+              ),
+          ],
+        ),
+      ),
+    );
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-          child: Text(
-            "In someone's Matches list",
-            style: AppType.body(size: 13, color: Palette.muted),
-          ),
+          child: Text("In someone's Matches list", style: AppType.body(size: 13, color: Palette.muted)),
         ),
         row(
           'Tara Fernandes',
           'Backend · 92% fit',
-          const Avatar(
-            url: '',
-            name: 'Tara Fernandes',
-            size: 46,
-            background: Palette.pink,
-          ),
+          const Avatar(url: '', name: 'Tara Fernandes', size: 46, background: Palette.pink),
         ),
         row(
           me.name,
@@ -231,12 +198,7 @@ class _CardPreviewScreenState extends State<CardPreviewScreen> {
         row(
           'Yash Agarwal',
           'Data & ML · 64% fit',
-          const Avatar(
-            url: '',
-            name: 'Yash Agarwal',
-            size: 46,
-            background: Palette.pink,
-          ),
+          const Avatar(url: '', name: 'Yash Agarwal', size: 46, background: Palette.pink),
         ),
       ],
     );
@@ -262,21 +224,13 @@ class _CardPreviewScreenState extends State<CardPreviewScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
-          child: Text(
-            "In your crew's chat",
-            style: AppType.body(size: 13, color: Palette.muted),
-          ),
+          child: Text("In your crew's chat", style: AppType.body(size: 13, color: Palette.muted)),
         ),
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           spacing: 8,
           children: [
-            const Avatar(
-              url: '',
-              name: 'Aisha Siddiqui',
-              size: 30,
-              background: Palette.pink,
-            ),
+            const Avatar(url: '', name: 'Aisha Siddiqui', size: 30, background: Palette.pink),
             Flexible(child: bubble('Who’s taking the demo video?')),
           ],
         ),
@@ -293,10 +247,7 @@ class _CardPreviewScreenState extends State<CardPreviewScreen> {
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(left: 10),
-                    child: Text(
-                      me.name.split(' ').first,
-                      style: AppType.body(size: 12, color: Palette.muted),
-                    ),
+                    child: Text(me.name.split(' ').first, style: AppType.body(size: 12, color: Palette.muted)),
                   ),
                   bubble('I can! I’ll cut it tonight 🎬'),
                 ],
