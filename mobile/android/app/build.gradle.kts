@@ -16,10 +16,13 @@ val hasReleaseKey = keyProperties.getProperty("storeFile") != null
 
 android {
     namespace = "dev.crewmatch.crewmatch"
-    compileSdk = flutter.compileSdkVersion
+    // 37 for flutter_local_notifications (update notifications).
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        // flutter_local_notifications needs Java 8+ APIs on older Android versions.
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -65,4 +68,8 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
