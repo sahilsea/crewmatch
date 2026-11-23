@@ -30,7 +30,7 @@ import { listHackathons, getHackathonLeaderboard } from '../controllers/hackatho
 import {
   listPosts, listUserPosts, createPost, deletePost, toggleLike, listComments, addComment, getPhoto,
 } from '../controllers/postController.js';
-import { listMessages, sendMessage, getFile } from '../controllers/chatController.js';
+import { listMessages, sendMessage } from '../controllers/chatController.js';
 
 const router = Router();
 
@@ -91,7 +91,6 @@ router.post('/crews/mine/members', validate(addMemberSchema), addMember);
 router.delete('/crews/mine/members/:userId', removeMember);
 router.get('/crews/mine/messages', listMessages);
 router.post('/crews/mine/messages', validate(messageSchema), sendMessage);
-router.get('/crews/mine/files/:id', getFile);
 
 // Hackathon feed
 router.get('/posts', listPosts);

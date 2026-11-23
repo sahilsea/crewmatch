@@ -3,20 +3,6 @@ import { HttpError } from '../middleware/error.js';
 export const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 // Documents a crew can share in its chat.
-export const FILE_TYPES = [
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.ms-powerpoint',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'text/plain',
-  'text/csv',
-  'application/zip',
-  ...IMAGE_TYPES,
-];
-
 const MB = 1024 * 1024;
 
 // "data:<type>;base64,<data>" → { type, data }, checked against the allowed

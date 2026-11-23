@@ -5,7 +5,6 @@ import Event from '../models/Event.js';
 import Post from '../models/Post.js';
 import Photo from '../models/Photo.js';
 import Message from '../models/Message.js';
-import FileDoc from '../models/File.js';
 import { decodeDataUrl, ownPhotoId, photoUrl } from '../utils/uploads.js';
 import { OPTIONS, MAX_SUPERPOWERS } from '../config/options.js';
 import { HttpError } from '../middleware/error.js';
@@ -151,6 +150,6 @@ export async function leaveCrewById(crewId, userId) {
     await crew.deleteOne();
     // Its event and challenge entries go with it: they free a spot and leave the leaderboard.
     await Event.updateMany({ 'entries.crew': crew._id }, { $pull: { entries: { crew: crew._id } } });
-    await Promise.all([Message.deleteMany({ crew: crew._id }), FileDoc.deleteMany({ crew: crew._id })]);
+    await Message.deleteMany({ crew: crew._id });
   }
 }
