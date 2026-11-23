@@ -1,3 +1,4 @@
+import 'club.dart';
 import 'json.dart';
 
 /// Where you stand with someone: nothing yet, a request either way, or matched.
@@ -41,6 +42,9 @@ class User {
     this.crewName,
     this.relation,
     this.requestId,
+    this.clubs = const [],
+    this.clubIds = const [],
+    this.isLead = false,
   });
 
   factory User.fromJson(Map<String, dynamic> json) => User(
@@ -74,6 +78,9 @@ class User {
         crewName: json['crewName'] as String?,
         relation: enumByName(Relation.values, json['relation'], Relation.none),
         requestId: json['requestId'] as String?,
+        clubs: ClubTag.listFrom(json['clubs']),
+        clubIds: stringList(json['clubIds']),
+        isLead: json['isLead'] == true,
       );
 
   static List<User> listFrom(Object? json) =>
@@ -132,6 +139,15 @@ class User {
   /// The pending request between you, when [relation] is sent or received.
   final String? requestId;
 
+  /// Their campus clubs (search, profiles, club pages).
+  final List<ClubTag> clubs;
+
+  /// Your own account: the clubs you're in.
+  final List<String> clubIds;
+
+  /// On a club page: they lead the club.
+  final bool isLead;
+
   User copyWith({
     Relation? relation,
     bool? inCrew,
@@ -172,5 +188,8 @@ class User {
         crewName: crewName,
         relation: relation ?? this.relation,
         requestId: requestId,
+        clubs: clubs,
+        clubIds: clubIds,
+        isLead: isLead,
       );
 }

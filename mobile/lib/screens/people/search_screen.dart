@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 
 import '../../api/api_exception.dart';
+import '../../models/club.dart';
 import '../../models/team_request.dart';
 import '../../models/user.dart';
 import '../../state/session.dart';
@@ -11,12 +12,16 @@ import '../../util/labels.dart';
 import 'people_ui.dart';
 import 'person_screen.dart';
 import 'share_card_screen.dart';
+import '../clubs/club_ui.dart';
 
 /// Find people by name, skill or role, and send a team-up request.
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key});
+  const SearchScreen({super.key, this.club});
 
-  static Route<void> route() => MaterialPageRoute(builder: (_) => const SearchScreen());
+  /// Starts filtered to one club's members.
+  final ClubTag? club;
+
+  static Route<void> route({ClubTag? club}) => MaterialPageRoute(builder: (_) => SearchScreen(club: club));
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -32,6 +37,7 @@ class _SearchScreenState extends State<SearchScreen> {
   var _noCrew = false;
   String? _role;
   String? _selectedHandle;
+  late ClubTag? _club = widget.club;
   final _busy = <String>{};
 
   @override
@@ -54,7 +60,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _load() async {
     try {
-      final results = await context.api.searchPeople(query: _query.text, noCrew: _noCrew, role: _role);
+      final results = await context.api.searchPeople(query: _query.text, noCrew: _noCrew, role: _role, clubId: _club?.id);
       if (!mounted) return;
       setState(() {
         _results = results;
@@ -66,6 +72,32 @@ class _SearchScreenState extends State<SearchScreen> {
     } catch (e) {
       if (mounted) setState(() => _error = e);
     }
+  }
+
+  /// Filter to one club's members.
+  Future<void> _pickClub() async {
+    final clubs = await context.api.clubs().catchError((Object _) => <Club>[]);
+    if (!mounted || clubs.isEmpty) return;
+    final picked = await showModalBottomSheet<Club>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => ListView(
+        shrinkWrap: true,
+        padding: const EdgeInsets.only(bottom: 16),
+        children: [
+          for (final c in clubs)
+            ListTile(
+              leading: ClubLogo(c, size: 36),
+              title: Text(c.name),
+              subtitle: Text(plural(c.memberCount, 'member')),
+              onTap: () => Navigator.of(context).pop(c),
+            ),
+        ],
+      ),
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _club = picked);
+    _load();
   }
 
   void _replace(User updated) => setState(() {
@@ -152,6 +184,21 @@ class _SearchScreenState extends State<SearchScreen> {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         children: [
+          if (_club case final club?)
+            InputChip(
+              avatar: ClubLogo(club, size: 22),
+              label: Text(club.name),
+              selected: true,
+              showCheckmark: false,
+              onDeleted: () {
+                setState(() => _club = null);
+                _load();
+              },
+              deleteButtonTooltipMessage: 'Remove the club filter',
+            )
+          else
+            ActionChip(avatar: const Icon(Icons.add_rounded, size: 18), label: const Text('Club'), onPressed: _pickClub),
+          const SizedBox(width: 8),
           FilterChip(
             label: const Text('No crew yet'),
             selected: _noCrew,
@@ -188,7 +235,7 @@ class _SearchScreenState extends State<SearchScreen> {
               if (i == 0) {
                 return Padding(
                   padding: const EdgeInsets.fromLTRB(12, 2, 12, 6),
-                  child: Text(plural(found.length, 'person', 'people'), style: AppType.body(size: 13, color: Palette.muted)),
+                  child: Text(_club == null ? plural(found.length, 'person', 'people') : '${plural(found.length, 'member')} of ${_club!.name}', style: AppType.body(size: 13, color: Palette.muted)),
                 );
               }
               final p = found[i - 1];
@@ -197,6 +244,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 delay: Motion.stagger((i - 1).clamp(0, 8)),
                 child: PersonRow(
                   person: p,
+                  highlightClubId: _club?.id,
                   selected: wide && p.handle == _selectedHandle,
                   onTap: () => _open(p, wide),
                   trailing: wide ? null : _rowAction(p),

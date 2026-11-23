@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../models/hub_event.dart';
 import '../../ui/ui.dart';
+import '../clubs/club_ui.dart';
 import '../../util/labels.dart';
 import '../../util/when.dart';
 
@@ -143,7 +144,7 @@ class _EventCardState extends State<EventCard> {
               ),
             ],
           ),
-          if (e.hosting || e.host != null) _HostLine(event: e),
+          if (e.hosting || e.host != null || e.club != null) _HostLine(event: e),
           if (_expanded) ...[
             if (e.summary.isNotEmpty) Text(e.summary, style: AppType.body(size: 14.5)),
             if (e.details.isNotEmpty) Text(e.details, style: AppType.body(size: 14, color: Palette.muted)),
@@ -317,15 +318,21 @@ class _HostLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final code = event.checkinCode;
-    final text = event.hosting ? 'You host this' : 'Hosted by ${event.host!.name}';
+    final club = event.club;
+    final text = club != null
+        ? 'Hosted by ${club.name}'
+        : event.hosting
+            ? 'You host this'
+            : 'Hosted by ${event.host!.name}';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: const BoxDecoration(color: Palette.strip, borderRadius: Frame.chipRadius),
       child: Row(
         spacing: 8,
         children: [
-          const Icon(Icons.person_outline_rounded, size: 18, color: Palette.muted),
+          if (club != null) ClubLogo(club, size: 22) else const Icon(Icons.person_outline_rounded, size: 18, color: Palette.muted),
           Expanded(child: Text(text, style: AppType.body(size: 14, weight: FontWeight.w500))),
+          if (club?.verified ?? false) const VerifiedBadge(),
           if (event.hosting && code != null)
             Semantics(
               label: 'Check-in code ${code.split('').join(' ')}',

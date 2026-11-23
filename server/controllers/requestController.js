@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import User from '../models/User.js';
 import Crew from '../models/Crew.js';
+import Club from '../models/Club.js';
 import TeamRequest from '../models/TeamRequest.js';
 import { compatibility, reasonTags } from '../utils/matching.js';
 import { HttpError } from '../middleware/error.js';
@@ -33,6 +34,14 @@ async function crewNames(users) {
   return Object.fromEntries(users.map((u) => [u.id, byCrew[u.crew?.toString()] ?? null]));
 }
 
+// Club badges for everyone's clubs, keyed by club id.
+async function clubsOf(users) {
+  const ids = [...new Set(users.flatMap((u) => (u.clubs ?? []).map(String)))];
+  if (!ids.length) return {};
+  const clubs = await Club.find({ _id: { $in: ids } });
+  return Object.fromEntries(clubs.map((c) => [c.id, c.toTag()]));
+}
+
 // Where I stand with each of these people: matched, a request sent or received.
 async function relations(me, users) {
   const ids = users.map((u) => u._id);
@@ -50,13 +59,14 @@ async function relations(me, users) {
 }
 
 // A person as the app shows them: public fields, fit with my team, crew, and where we stand.
-async function present(me, users) {
-  const [team, crews, rel] = await Promise.all([teamFor(me), crewNames(users), relations(me, users)]);
+export async function present(me, users) {
+  const [team, crews, rel, clubTags] = await Promise.all([teamFor(me), crewNames(users), relations(me, users), clubsOf(users)]);
   return users.map((u) => ({
     ...u.toPublic(),
     score: compatibility(team, u),
     tags: reasonTags(team, u),
     crewName: crews[u.id] ?? null,
+    clubs: (u.clubs ?? []).map((id) => clubTags[id.toString()]).filter(Boolean),
     relation: rel[u.id]?.relation ?? null,
     requestId: rel[u.id]?.requestId ?? null,
   }));
@@ -74,6 +84,7 @@ export async function searchUsers(req, res) {
   }
   if (req.query.free === '1') filter.crew = null;
   if (req.query.role) filter.role = String(req.query.role);
+  if (req.query.club && mongoose.isValidObjectId(req.query.club)) filter.clubs = req.query.club;
   const users = await User.find(filter).limit(200);
   const results = (await present(me, users)).sort((a, b) => b.score - a.score).slice(0, 50);
   res.json({ count: results.length, results });

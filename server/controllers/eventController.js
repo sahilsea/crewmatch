@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import Event from '../models/Event.js';
+import Club from '../models/Club.js';
 import { EVENT_KINDS, CHECKIN_GRACE_MINUTES, MAX_HOSTED_EVENTS } from '../config/options.js';
 import { HttpError } from '../middleware/error.js';
 import { rankCrews } from '../utils/leaderboard.js';
@@ -7,7 +8,11 @@ import { postSystemMessage } from './chatController.js';
 
 // Crew names and sizes for every entry. A crew that has since dissolved populates to null.
 // Plus the host's name for student events.
-const withCrews = [{ path: 'entries.crew', select: 'name members' }, { path: 'createdBy', select: 'name isAdmin' }];
+const withCrews = [
+  { path: 'entries.crew', select: 'name members' },
+  { path: 'createdBy', select: 'name isAdmin' },
+  { path: 'club', select: 'name short tone verified leads' },
+];
 
 // Unknown and malformed ids are both "not found".
 async function findEvent(id) {
@@ -145,17 +150,26 @@ export async function submitEntry(req, res) {
 // POST /api/events — a student hosts their own event. It's live at once as a
 // community event; asking for points sends it to the organisers (pending).
 export async function hostEvent(req, res) {
-  const { askPoints = 0, ...fields } = req.body;
+  const { askPoints = 0, clubId, ...fields } = req.body;
   if (fields.endsAt <= Date.now()) throw new HttpError(400, 'Pick an end time in the future');
+  // Club leads can host for their club; a verified club's events count straight away.
+  let club = null;
+  if (clubId) {
+    club = mongoose.isValidObjectId(clubId) ? await Club.findById(clubId) : null;
+    if (!club) throw new HttpError(404, 'Club not found');
+    if (!club.leads.includes(req.user.email)) throw new HttpError(403, `Only ${club.name}'s leads can post for it`);
+  }
+  const official = !!club?.verified;
   const hosting = await Event.countDocuments({ createdBy: req.user._id, status: { $ne: 'official' }, endsAt: { $gt: new Date() } });
   if (hosting >= MAX_HOSTED_EVENTS) throw new HttpError(409, `You can host up to ${MAX_HOSTED_EVENTS} events at a time`);
   const event = await Event.create({
     ...fields,
-    points: 0,
+    points: official ? askPoints : 0,
     checkinCode: null,
-    status: askPoints > 0 ? 'pending' : 'community',
+    status: official ? 'official' : askPoints > 0 ? 'pending' : 'community',
     askedPoints: askPoints,
     createdBy: req.user._id,
+    club: club?._id ?? null,
   });
   res.status(201).json({ event: await memberView(event._id, req.user) });
 }

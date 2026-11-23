@@ -5,6 +5,7 @@ import '../../models/hub_event.dart';
 import '../../models/post.dart';
 import '../../state/session.dart';
 import '../../ui/ui.dart';
+import '../clubs/clubs_screen.dart';
 import '../events/check_in_dialog.dart';
 import '../events/events_screen.dart';
 import '../shell/app_tab.dart';
@@ -204,7 +205,17 @@ class _PostsScreenState extends State<PostsScreen> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const ScreenHeader(title: 'Posts'),
+            ScreenHeader(
+              title: 'Posts',
+              trailing: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(ClubsScreen.route()),
+                  icon: const Icon(Icons.groups_2_outlined, size: 18),
+                  label: const Text('Clubs'),
+                ),
+              ),
+            ),
             Expanded(
               child: posts == null
                   ? (_error == null

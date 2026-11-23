@@ -45,6 +45,8 @@ const userSchema = new Schema(
     swipedRight: [ref],
     swipedLeft: [ref],
     matches: [ref],
+    // Campus clubs, shown on their card (at most 5).
+    clubs: [{ type: Schema.Types.ObjectId, ref: 'Club' }],
     crew: { type: Schema.Types.ObjectId, ref: 'Crew', default: null },
 
     // Email verification: a 6-digit code, stored hashed, valid for 15 minutes.
@@ -119,6 +121,7 @@ userSchema.methods.toSelf = function () {
     emailVerified: this.emailVerified || !emailCodesRequired(),
     isAdmin: this.isAdmin,
     matchCount: this.matches.length,
+    clubIds: (this.clubs ?? []).map(String),
   };
 };
 

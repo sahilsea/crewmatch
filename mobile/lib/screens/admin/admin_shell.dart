@@ -5,6 +5,7 @@ import '../../state/session.dart';
 import '../../ui/ui.dart';
 import '../leaderboard/leaderboard_screen.dart';
 import '../shell/top_menu_bar.dart';
+import 'admin_clubs_screen.dart';
 import 'admin_common.dart';
 import 'admin_events_screen.dart';
 import 'admin_overview_screen.dart';
@@ -65,6 +66,7 @@ class _AdminShellState extends State<AdminShell> {
             ),
           AdminTab.events => AdminEventsScreen(wide: wide, startNew: _startNew, onOpen: _open, onChanged: _refreshCount),
           AdminTab.review => AdminReviewScreen(wide: wide, onChanged: _refreshCount),
+          AdminTab.clubs => AdminClubsScreen(wide: wide),
           AdminTab.ranks => LeaderboardScreen(onOpen: (_) {}, wide: wide),
         },
       );

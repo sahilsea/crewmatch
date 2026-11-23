@@ -7,6 +7,7 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import TeamRequest from '../models/TeamRequest.js';
+import Club from '../models/Club.js';
 import Crew from '../models/Crew.js';
 import Event from '../models/Event.js';
 import Post from '../models/Post.js';
@@ -392,8 +393,44 @@ async function seedRequests() {
   await TeamRequest.insertMany(docs.filter((r) => r.from));
 }
 
+// Campus clubs: [name, short, category, tone, verified, description].
+const CLUBS = [
+  ['Coding Club', 'CC', 'tech', 'crimson', true, 'Weekly contests, DSA nights and the campus hackathon.'],
+  ['AI & ML Society', 'AI', 'tech', 'navy', true, 'Paper readings, Kaggle squads and model demos.'],
+  ['E-Cell', 'EC', 'business', 'gold', true, 'Pitch nights, founder talks and startup weekends.'],
+  ['Design Guild', 'DG', 'design', 'cream', false, 'Critique circles, Figma jams and poster drops.'],
+  ['Robotics Society', 'RS', 'tech', 'gold', true, 'Build nights, line followers and the robo-war team.'],
+  ['Open Source Club', 'OS', 'tech', 'navy', false, 'First PRs, Hacktoberfest and maintainer meetups.'],
+  ['Photography Club', 'PC', 'culture', 'cream', false, 'Photo walks, edits and the campus exhibition.'],
+  ['Music Club', 'MC', 'culture', 'crimson', true, 'Jam rooms, open mics and the fest band.'],
+];
+
+async function seedClubs() {
+  const clubs = await Club.insertMany(CLUBS.map(([name, short, category, tone, verified, description]) => ({ name, short, category, tone, verified, description })));
+  const byName = Object.fromEntries(clubs.map((c) => [c.name, c]));
+  const students = await User.find({ isAdmin: false }).sort({ name: 1 });
+  // Everyone in one or two clubs, spread evenly; the demo accounts in Coding Club and Design Guild.
+  await User.bulkWrite(students.map((u, i) => {
+    const demo = u.email.endsWith('@crewmatch.dev');
+    const picks = demo ? [byName['Coding Club'], byName['Design Guild']] : [clubs[i % clubs.length], ...(i % 3 === 0 ? [clubs[(i + 3) % clubs.length]] : [])];
+    return { updateOne: { filter: { _id: u._id }, update: { $set: { clubs: [...new Set(picks.map((c) => c._id))] } } } };
+  }));
+  // Leads can post events for their club. The web demo account leads Coding Club.
+  const tara = students.find((u) => u.name === 'Tara Fernandes');
+  await Club.updateOne({ _id: byName['Coding Club']._id }, { $set: { leads: ['web@crewmatch.dev', tara?.email].filter(Boolean) } });
+  await Event.create([
+    ['DSA Night: Graphs', 'Shortest paths and union-find, with snacks.', 'workshop', 'Lab 2', 1, 19, 30],
+    ['Mock Interviews', 'Seniors run 20-minute coding interviews.', 'talk', 'Seminar Room', 2, 17, 20],
+    ['Open Source Sprint', 'Pick an issue, ship a PR before dinner.', 'workshop', 'Library Annexe', 3, 14, 40],
+  ].map(([title, summary, category, location, day, hour, points]) => ({
+    kind: 'event', title, summary, category, location, points, status: 'official',
+    startsAt: dayAt(day, hour), endsAt: dayAt(day, hour + 2), createdBy: tara?._id, club: byName['Coding Club']._id,
+  })));
+  return clubs;
+}
+
 export async function seedDatabase() {
-  await Promise.all([User.deleteMany({}), Crew.deleteMany({}), Event.deleteMany({}), Post.deleteMany({}), Message.deleteMany({}), TeamRequest.deleteMany({})]);
+  await Promise.all([User.deleteMany({}), Crew.deleteMany({}), Event.deleteMany({}), Post.deleteMany({}), Message.deleteMany({}), TeamRequest.deleteMany({}), Club.deleteMany({})]);
 
   // Insert with one shared hash: insertMany skips the save hook, and hashing 30 times is slow.
   const password = await bcrypt.hash(SEED_PASSWORD, 10);
@@ -410,6 +447,7 @@ export async function seedDatabase() {
   const hosted = await seedStudentEvents();
   await User.backfillHandles();
   await seedRequests();
+  const clubs = await seedClubs();
   await seedFeed(crewIds);
   await seedCards();
 
@@ -420,6 +458,7 @@ export async function seedDatabase() {
   for (const e of events.filter((ev) => ev.kind === 'event')) {
     console.log(`  ${e.checkinCode}  ${e.title} (${e.state})`);
   }
+  console.log(`${clubs.length} clubs, with 3 Coding Club events.`);
   console.log(`Plus ${hosted.length} student-hosted events (${hosted.filter((e) => e.status === 'pending').length} waiting for review).`);
 }
 

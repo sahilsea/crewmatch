@@ -48,7 +48,16 @@ export function compatibility(team, candidate) {
   const shared = [...candInterests].filter((i) => teamInterests.has(i)).length;
   const interests = shared / Math.max(Math.min(teamInterests.size, candInterests.size), 1);
 
-  return Math.round(100 * (0.5 * skills + 0.3 * style + 0.2 * interests));
+  // A small boost for sharing a campus club: +3 per club, at most +6, so it
+  // breaks ties without lifting everyone in your club to the top.
+  const bonus = Math.min(6, 3 * sharedClubs(team, candidate));
+  return Math.min(100, Math.round(100 * (0.5 * skills + 0.3 * style + 0.2 * interests)) + bonus);
+}
+
+// How many of the candidate's clubs someone on the team is also in.
+function sharedClubs(team, candidate) {
+  const teamClubs = new Set(team.flatMap((m) => (m.clubs ?? []).map(String)));
+  return (candidate.clubs ?? []).filter((c) => teamClubs.has(String(c))).length;
 }
 
 // Up to 3 instant, free reasons to show on the card.
@@ -70,6 +79,7 @@ export function reasonTags(team, candidate) {
     const names = { night_owl: 'Fellow night owl', morning_person: 'Fellow early bird' };
     tags.push(names[candidate.schedule] ?? 'Same schedule');
   }
+  if (sharedClubs(team, candidate)) tags.push('In your club');
   return tags.slice(0, 3);
 }
 

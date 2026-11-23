@@ -5,6 +5,7 @@ import {
   registerSchema, loginSchema, profileSchema, swipeSchema, createCrewSchema, addMemberSchema,
   eventInputSchema, studentEventSchema, officialSchema, checkinSchema, submitSchema, approveSchema, rejectSchema,
   createPostSchema, commentSchema, messageSchema, photoUploadSchema, verifySchema, googleSchema, teamRequestSchema,
+  clubSchema, myClubsSchema,
 } from '../utils/schemas.js';
 import { register, login, googleSignIn, me, verifyEmail, resendCode } from '../controllers/authController.js';
 import {
@@ -22,6 +23,9 @@ import { getStats, listUsers } from '../controllers/adminController.js';
 import {
   searchUsers, getByHandle, publicProfile, sendRequest, listRequests, acceptRequest, declineRequest, withdrawRequest,
 } from '../controllers/requestController.js';
+import {
+  listClubs, getClub, joinClub, leaveClub, setMyClubs, adminListClubs, createClub, updateClub, deleteClub,
+} from '../controllers/clubController.js';
 import { listHackathons, getHackathonLeaderboard } from '../controllers/hackathonController.js';
 import {
   listPosts, listUserPosts, createPost, deletePost, toggleLike, listComments, addComment, getPhoto,
@@ -59,6 +63,11 @@ router.delete('/users/me/cover', removeCover);
 // Finding people: search, profile links and team-up requests (before /users/:id).
 router.get('/users/search', searchUsers);
 router.get('/users/handle/:handle', getByHandle);
+router.get('/clubs', listClubs);
+router.get('/clubs/:id', getClub);
+router.post('/clubs/:id/join', joinClub);
+router.delete('/clubs/:id/join', leaveClub);
+router.put('/users/me/clubs', validate(myClubsSchema), setMyClubs);
 router.get('/requests', listRequests);
 router.post('/requests', validate(teamRequestSchema), sendRequest);
 router.post('/requests/:id/accept', acceptRequest);
@@ -107,6 +116,10 @@ router.get('/hackathons', listHackathons);
 router.get('/hackathons/:id/leaderboard', getHackathonLeaderboard);
 
 router.get('/admin/stats', adminOnly, getStats);
+router.get('/admin/clubs', adminOnly, adminListClubs);
+router.post('/admin/clubs', adminOnly, validate(clubSchema), createClub);
+router.patch('/admin/clubs/:id', adminOnly, validate(clubSchema.partial()), updateClub);
+router.delete('/admin/clubs/:id', adminOnly, deleteClub);
 router.get('/admin/users', adminOnly, listUsers);
 router.get('/admin/events', adminOnly, adminListEvents);
 router.post('/admin/events', adminOnly, validate(eventInputSchema), createEvent);
