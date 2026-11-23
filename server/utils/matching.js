@@ -28,7 +28,9 @@ function styleFit(a, b) {
   return (schedule + (1 - gap / 2) + comms) / 3;
 }
 
-export function compatibility(team, candidate) {
+// The score in parts: points out of 50 (complementary skills), 30 (work style)
+// and 20 (shared interests), plus the small club boost.
+export function breakdown(team, candidate) {
   const teamRoles = new Set(team.map((m) => m.role));
   const teamSkills = new Set(team.flatMap((m) => [...lower(m.skills)]));
   const candSkills = lower(candidate.skills);
@@ -51,8 +53,16 @@ export function compatibility(team, candidate) {
   // A small boost for sharing a campus club: +3 per club, at most +6, so it
   // breaks ties without lifting everyone in your club to the top.
   const bonus = Math.min(6, 3 * sharedClubs(team, candidate));
-  return Math.min(100, Math.round(100 * (0.5 * skills + 0.3 * style + 0.2 * interests)) + bonus);
+  return {
+    skills: Math.round(50 * skills),
+    style: Math.round(30 * style),
+    interests: Math.round(20 * interests),
+    clubs: bonus,
+    total: Math.min(100, Math.round(100 * (0.5 * skills + 0.3 * style + 0.2 * interests)) + bonus),
+  };
 }
+
+export const compatibility = (team, candidate) => breakdown(team, candidate).total;
 
 // How many of the candidate's clubs someone on the team is also in.
 function sharedClubs(team, candidate) {

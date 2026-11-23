@@ -45,6 +45,8 @@ class User {
     this.clubs = const [],
     this.clubIds = const [],
     this.isLead = false,
+    this.breakdown,
+    this.record,
   });
 
   factory User.fromJson(Map<String, dynamic> json) => User(
@@ -81,6 +83,8 @@ class User {
         clubs: ClubTag.listFrom(json['clubs']),
         clubIds: stringList(json['clubIds']),
         isLead: json['isLead'] == true,
+        breakdown: FitBreakdown.from(json['breakdown']),
+        record: HackRecord.from(json['record']),
       );
 
   static List<User> listFrom(Object? json) =>
@@ -148,6 +152,12 @@ class User {
   /// On a club page: they lead the club.
   final bool isLead;
 
+  /// Deck cards: how the fit score splits up.
+  final FitBreakdown? breakdown;
+
+  /// Deck cards: what their crew has finished.
+  final HackRecord? record;
+
   User copyWith({
     Relation? relation,
     bool? inCrew,
@@ -191,5 +201,51 @@ class User {
         clubs: clubs,
         clubIds: clubIds,
         isLead: isLead,
+        breakdown: breakdown,
+        record: record,
       );
+}
+
+/// The parts of a fit score: skills out of 50, style out of 30, interests out of 20, plus a club bonus.
+class FitBreakdown {
+  const FitBreakdown({required this.skills, required this.style, required this.interests, this.clubs = 0});
+
+  final int skills;
+  final int style;
+  final int interests;
+  final int clubs;
+
+  static FitBreakdown? from(Object? json) => json is Map<String, dynamic>
+      ? FitBreakdown(
+          skills: intOr(json['skills']),
+          style: intOr(json['style']),
+          interests: intOr(json['interests']),
+          clubs: intOr(json['clubs']),
+        )
+      : null;
+}
+
+/// Events, challenges and points their crew has completed, and the latest one.
+class HackRecord {
+  const HackRecord({this.events = 0, this.challenges = 0, this.points = 0, this.lastTitle, this.lastAt});
+
+  final int events;
+  final int challenges;
+  final int points;
+  final String? lastTitle;
+  final DateTime? lastAt;
+
+  bool get isEmpty => events == 0 && challenges == 0;
+
+  static HackRecord? from(Object? json) {
+    if (json is! Map<String, dynamic>) return null;
+    final last = json['last'];
+    return HackRecord(
+      events: intOr(json['events']),
+      challenges: intOr(json['challenges']),
+      points: intOr(json['points']),
+      lastTitle: last is Map<String, dynamic> ? last['title'] as String? : null,
+      lastAt: last is Map<String, dynamic> ? dateOrNull(last['at']) : null,
+    );
+  }
 }

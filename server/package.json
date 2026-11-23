@@ -8,6 +8,8 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "seed": "node seed/seed.js",
+    "seed:clubs": "node seed/clubs.js",
+    "seed:profiles": "node seed/profiles.js",
     "test": "node --test"
   },
   "dependencies": {

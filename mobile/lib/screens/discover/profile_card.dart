@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../models/user.dart';
+import '../clubs/club_ui.dart';
 import '../people/people_ui.dart';
 import '../../ui/ui.dart';
 import '../../util/labels.dart';
@@ -127,6 +128,8 @@ class ProfileCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 spacing: 8,
                 children: [
+                  if ((person.headline.isNotEmpty ? person.headline : person.bio) case final line when line.isNotEmpty)
+                    Text(line, maxLines: 3, overflow: TextOverflow.ellipsis, style: AppType.body(size: 16, height: 1.4)),
                   if (person.tags.isNotEmpty)
                     Rise(
                       delay: const Duration(milliseconds: 80),
@@ -143,6 +146,23 @@ class ProfileCard extends StatelessWidget {
                     Rise(
                       delay: const Duration(milliseconds: 160),
                       child: Wrap(spacing: 6, runSpacing: 6, children: chips),
+                    ),
+                  if (person.clubs.isNotEmpty || person.crewName != null || person.score != null)
+                    Rise(
+                      delay: const Duration(milliseconds: 220),
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          for (final c in person.clubs.take(2)) ClubChip(c),
+                          if (person.score != null)
+                            Text(
+                              crewStatus(person),
+                              style: AppType.body(size: 12.5, weight: FontWeight.w500, color: person.crewName == null ? Palette.link : Palette.muted),
+                            ),
+                        ],
+                      ),
                     ),
                 ],
               ),
@@ -162,51 +182,35 @@ class _Cover extends StatelessWidget {
   final String? fit;
 
   @override
-  Widget build(BuildContext context) {
-    final headline = person.headline.isNotEmpty
-        ? person.headline
-        : (person.bio.isNotEmpty ? person.bio : null);
-    return DecoratedBox(
-      decoration: CardStyle.cover(person.cover, photoUrl: person.coverUrl),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (person.cover == 'circuit')
-            const CustomPaint(painter: _CircuitPainter()),
-          if (headline != null)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: DecoratedBox(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0x00000000), Color(0x9E0A0603)],
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 36, 18, 50),
-                  child: Text(
-                    headline,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppType.body(
-                      size: 17,
-                      weight: FontWeight.w500,
-                      height: 1.3,
-                      color: const Color(0xFFFFF6E0),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          if (fit != null) Positioned(top: 14, left: 14, child: _FitTag(fit!)),
-        ],
-      ),
-    );
+  Widget build(BuildContext context) => DecoratedBox(
+        decoration: CardStyle.cover(person.cover, photoUrl: person.coverUrl),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // A texture on the preset covers, so a big cover never reads as empty.
+            if (person.cover == 'circuit') const CustomPaint(painter: _CircuitPainter()) else if (person.coverUrl == null) const CustomPaint(painter: _DotsPainter()),
+            if (fit != null) Positioned(top: 14, left: 14, child: _FitTag(fit!)),
+          ],
+        ),
+      );
+}
+
+/// Soft gold dots for the preset covers.
+class _DotsPainter extends CustomPainter {
+  const _DotsPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = const Color(0x2EE8C25E);
+    for (var y = 6.0; y < size.height; y += 14) {
+      for (var x = 6.0; x < size.width; x += 14) {
+        canvas.drawCircle(Offset(x, y), 1.6, paint);
+      }
+    }
   }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _FitTag extends StatelessWidget {
@@ -215,28 +219,20 @@ class _FitTag extends StatelessWidget {
   final String label;
 
   @override
-  Widget build(BuildContext context) => Pulse(
-    minScale: 0.96,
-    period: const Duration(milliseconds: 1400),
+  Widget build(BuildContext context) => PopIn(
     child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: const BoxDecoration(
-        color: Palette.crimson,
-        borderRadius: Frame.chipRadius,
+        color: Palette.gold,
+        borderRadius: BorderRadius.all(Radius.circular(999)),
+        boxShadow: [BoxShadow(color: Color(0x40000000), blurRadius: 8, offset: Offset(0, 2))],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         spacing: 6,
         children: [
-          const Icon(Icons.bolt_rounded, size: 16, color: Palette.onCrimson),
-          Text(
-            label,
-            style: AppType.body(
-              size: 14,
-              weight: FontWeight.w700,
-              color: Palette.onCrimson,
-            ),
-          ),
+          const Icon(Icons.bolt_rounded, size: 18, color: Palette.onGold),
+          Text(label, style: AppType.body(size: 15, weight: FontWeight.w700, color: Palette.onGold)),
         ],
       ),
     ),

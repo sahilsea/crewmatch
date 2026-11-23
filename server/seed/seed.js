@@ -33,13 +33,59 @@ const SKILLS = {
   pm: ['Notion', 'Jira', 'Roadmapping', 'Presentations', 'Market Research', 'Agile'],
 };
 
-const BIOS = {
-  frontend: 'I make interfaces that feel fast and look clean.',
-  backend: 'APIs, databases and making sure nothing falls over at 2am.',
-  fullstack: 'Happy anywhere in the stack, from schema to button.',
-  designer: 'I turn rough ideas into screens people actually enjoy using.',
-  ml: 'I like teaching models to do useful things with messy data.',
-  pm: 'I keep the crew focused and I love a good pitch deck.',
+// Five bios and headlines per role, so no two demo students read the same.
+export const BIOS = {
+  frontend: [
+    'I make interfaces that feel fast and look clean. Built our club site in React over a weekend.',
+    'Flutter and React, mostly. I care about the small animations nobody notices until they are gone.',
+    'Turned three hackathon prototypes into apps people still use on campus.',
+    'Pixel-pusher with a CS degree in progress. Happiest when the demo just works.',
+    'Accessibility nerd. If it works with a screen reader, it works for everyone.',
+  ],
+  backend: [
+    'APIs, databases and making sure nothing falls over at 2am.',
+    'Node and Postgres by day, Go when I want it to be fast. Two hackathon wins on the backend.',
+    'I write the boring code that keeps the demo alive. Docker, Redis, the works.',
+    'Built a campus canteen ordering API that handled the whole lunch rush.',
+    'Love clean data models and small, well-tested services.',
+  ],
+  fullstack: [
+    'Happy anywhere in the stack, from schema to button.',
+    'Shipped a lost-and-found app for the library in a weekend. MERN, mostly.',
+    'Next.js and Firebase are my hackathon speedrun kit.',
+    'I glue things together: APIs, UI, deploys. Looking for a designer and a pitcher.',
+    'Two years of freelance web work. I like owning a feature end to end.',
+  ],
+  designer: [
+    'I turn rough ideas into screens people actually enjoy using.',
+    'Figma, motion and a lot of sticky notes. I run our Design Guild critiques.',
+    'Posters, logos and app UI. I can also cut the demo video.',
+    'User research first, pixels second. Talked to 40 students for our last project.',
+    'I sketch fast and iterate faster. Happy to own the whole look of the app.',
+  ],
+  ml: [
+    'I like teaching models to do useful things with messy data.',
+    'Kaggle top 10% twice. Python, PyTorch and good plots.',
+    'Built a crop-disease detector for my village. Now into NLP.',
+    'Dashboards, models and night-owl bug hunts.',
+    'Recommendation systems and a soft spot for clean datasets.',
+  ],
+  pm: [
+    'I keep the crew focused and I love a good pitch deck.',
+    'Ran E-Cell pitch nights for a year. I can sell almost any idea in 90 seconds.',
+    'Roadmaps, user interviews and making sure we submit on time.',
+    'I turn chaos into a plan and a plan into a demo.',
+    'Former debate captain. I talk to the judges so you can keep coding.',
+  ],
+};
+
+export const HEADLINES = {
+  frontend: ['Interfaces that feel fast', 'Flutter, React and tiny animations', 'From prototype to app people use', 'Demo-day UI that just works', 'Accessible by default'],
+  backend: ['APIs that never go down during the demo', 'Node, Postgres and two hackathon wins', 'The boring code that keeps you alive', 'Built for the lunch rush', 'Clean models, tested services'],
+  fullstack: ['Schema to button', 'A whole app in a weekend', 'Next.js speedrunner', 'Looking for a designer and a pitcher', 'I own features end to end'],
+  designer: ['Screens people enjoy using', 'Figma, motion and sticky notes', 'Posters, logos and the demo video', 'Research first, pixels second', 'Fast sketches, faster iterations'],
+  ml: ['Useful models from messy data', 'Kaggle top 10% twice', 'ML for real problems', 'Dashboards and night-owl bug hunts', 'Recommendations that make sense'],
+  pm: ['Your crew\'s presenter', 'Sells an idea in 90 seconds', 'We submit on time', 'Chaos to plan to demo', 'I talk to the judges'],
 };
 
 // Small deterministic RNG so every seed run produces the same students.
@@ -67,7 +113,8 @@ function buildStudents() {
       name,
       email: `${first}.${last}@students.crewmatch.dev`,
       avatar: `https://api.dicebear.com/9.x/notionists/png?seed=${encodeURIComponent(name)}`,
-      bio: BIOS[role],
+      bio: BIOS[role][Math.floor(i / OPTIONS.role.length) % BIOS[role].length],
+      headline: HEADLINES[role][Math.floor(i / OPTIONS.role.length) % HEADLINES[role].length],
       role,
       experienceLevel: pick(OPTIONS.experienceLevel),
       schedule: pick(OPTIONS.schedule),
@@ -394,7 +441,7 @@ async function seedRequests() {
 }
 
 // Campus clubs: [name, short, category, tone, verified, description].
-const CLUBS = [
+export const CLUBS = [
   ['Coding Club', 'CC', 'tech', 'crimson', true, 'Weekly contests, DSA nights and the campus hackathon.'],
   ['AI & ML Society', 'AI', 'tech', 'navy', true, 'Paper readings, Kaggle squads and model demos.'],
   ['E-Cell', 'EC', 'business', 'gold', true, 'Pitch nights, founder talks and startup weekends.'],
@@ -427,6 +474,53 @@ async function seedClubs() {
     startsAt: dayAt(day, hour), endsAt: dayAt(day, hour + 2), createdBy: tara?._id, club: byName['Coding Club']._id,
   })));
   return clubs;
+}
+
+// Adds the mock clubs to a live database without touching anything else:
+// clubs that already exist (same name) are skipped, only demo students with no
+// clubs get one, and Coding Club gets its events only when it's newly made.
+// Run with `npm run seed:clubs`. Safe to run more than once.
+export async function addMockClubs() {
+  const made = [];
+  for (const [name, short, category, tone, verified, description] of CLUBS) {
+    const exists = await Club.findOne({ name }).collation({ locale: 'en', strength: 2 });
+    if (!exists) made.push(await Club.create({ name, short, category, tone, verified, description }));
+  }
+  const clubs = await Club.find({ name: { $in: CLUBS.map(([n]) => n) } }).collation({ locale: 'en', strength: 2 });
+  const students = await User.find({ email: /@students\.crewmatch\.dev$/, isAdmin: false, clubs: { $size: 0 } }).sort({ name: 1 });
+  if (clubs.length) {
+    await User.bulkWrite(students.map((u, i) => ({
+      updateOne: { filter: { _id: u._id }, update: { $set: { clubs: [clubs[i % clubs.length]._id] } } },
+    })));
+  }
+  const coding = made.find((c) => c.name === 'Coding Club');
+  if (coding) {
+    const tara = await User.findOne({ name: 'Tara Fernandes', isAdmin: false });
+    await Club.updateOne({ _id: coding._id }, { $set: { leads: ['web@crewmatch.dev', tara?.email].filter(Boolean) } });
+    await Event.create([
+      ['DSA Night: Graphs', 'Shortest paths and union-find, with snacks.', 'workshop', 'Lab 2', 1, 19, 30],
+      ['Mock Interviews', 'Seniors run 20-minute coding interviews.', 'talk', 'Seminar Room', 2, 17, 20],
+      ['Open Source Sprint', 'Pick an issue, ship a PR before dinner.', 'workshop', 'Library Annexe', 3, 14, 40],
+    ].map(([title, summary, category, location, day, hour, points]) => ({
+      kind: 'event', title, summary, category, location, points, status: 'official',
+      startsAt: dayAt(day, hour), endsAt: dayAt(day, hour + 2), createdBy: tara?._id, club: coding._id,
+    })));
+  }
+  return { created: made.map((c) => c.name), skipped: CLUBS.length - made.length, studentsJoined: students.length, codingEvents: coding ? 3 : 0 };
+}
+
+// Gives the demo students on a live database their new bios and headlines.
+// Only touches @students.crewmatch.dev accounts; real users are left alone.
+// Run with `npm run seed:profiles`. Safe to run more than once.
+export async function refreshDemoProfiles() {
+  const fresh = buildStudents();
+  const result = await User.bulkWrite(fresh.map((u) => ({
+    updateOne: {
+      filter: { email: u.email },
+      update: { $set: { bio: u.bio, ...(CARDS[u.name] ? {} : { headline: u.headline }) } },
+    },
+  })));
+  return result.modifiedCount;
 }
 
 export async function seedDatabase() {
